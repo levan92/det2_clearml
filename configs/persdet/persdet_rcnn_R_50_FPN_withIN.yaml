@@ -1,0 +1,43 @@
+_BASE_: "../COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+OUTPUT_DIR: "./output"
+DATALOADER:
+    FILTER_EMPTY_ANNOTATIONS: False
+MODEL:
+    WEIGHTS: "./weights/faster_rcnn_R_50_FPN_3x/model_final_280758.pkl"
+    # WEIGHTS: "./weights/faster_rcnn_R_50_FPN_3x/model_final_280758_anchor-removed.pkl"
+    # WEIGHTS: "..../weights/R-50.pkl"
+    # WEIGHTS: "detectron2://ImageNetPretrained/MSRA/R-50.pkl"
+    INSTANCE_NORM: True
+    BACKBONE:
+        NAME: "build_resnet_IN_fpn_backbone"
+    ROI_HEADS:
+        NUM_CLASSES: 1
+    ANCHOR_GENERATOR:
+        # DEFAULTS
+        SIZES: [[32], [64], [128], [256], [512]]
+        ASPECT_RATIOS: [[0.5, 1.0, 2.0]]
+SOLVER:
+    IMS_PER_BATCH: 4
+    # IMS_PER_BATCH: 16
+    # BASE_LR: 0.01
+    BASE_LR: 0.02
+    STEPS: (60000, 120000, 180000)
+    # STEPS: (210000, 250000)
+    MAX_ITER: 200000
+    # MAX_ITER: 270000
+    # WARMUP_ITERS: 10
+INPUT:
+    # Sample size of smallest side by choice or random selection from range give by MIN_SIZE_TRAIN
+    MIN_SIZE_TRAIN_SAMPLING: "choice"
+    # Maximum size of the side of the image during training
+    MAX_SIZE_TRAIN: 1333
+    # Size of the smallest side of the image during testing. Set to zero to disable resize in testing.
+    MIN_SIZE_TEST: 800
+    # Maximum size of the side of the image during testing
+    MAX_SIZE_TEST: 1333
+    CROP:
+        ENABLED: True
+        TYPE: "relative_range"
+        SIZE: [0.5, 1.0]
+TEST:
+    EVAL_PERIOD: 6000
