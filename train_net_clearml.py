@@ -42,10 +42,6 @@ parser.add_argument(
     "https://pytorch.org/docs/stable/distributed.html for details.",
 )
 parser.add_argument(
-    "--awskey",
-    help="Key to S3 bucket"
-)
-parser.add_argument(
     "--download-data",
     help="List of dataset to download",
     nargs='+'
@@ -147,9 +143,11 @@ Clearml
 """
 if not args.noclearml:
     # task = Task.init(project_name='persdet2',task_name='Train',task_type='training', output_uri='s3://192.168.56.253:9000/models/snapshots/')
+    # task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri='https://130.14.2.121/public-data/digitalhub/persdet/snapshots/det2')
+    # task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri='s3://130.14.2.121/public-data/digitalhub/persdet/snapshots/det2')
     task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
-    task.set_base_docker(f"harbor.io/custom/detectron2:v3 --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
-    task.execute_remotely(queue_name="gpu", exit_process=True)
+    task.set_base_docker(f"harbor.dsta.ai/public/detectron2:v3 --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
+    task.execute_remotely(queue_name="1gpu", exit_process=True)
 
 '''
 S3 downloading
@@ -165,11 +163,11 @@ s3=boto3.resource('s3',
         region_name='us-east-1')
 
 if args.model_weights:
-    magic_weights_path = Path('cv-models/persdet/det2')
+    magic_weights_path = Path('digitalhub/persdet/models')
     s3_weights_path = magic_weights_path / Path(args.model_weights)
     local_weights_path = 'weights' / Path(args.model_weights)
     local_weights_path.parent.mkdir(parents=True, exist_ok=True)
-    s3.Bucket('models').download_file(str(s3_weights_path), str(local_weights_path))
+    s3.Bucket('public-data').download_file(str(s3_weights_path), str(local_weights_path))
 
     assert local_weights_path.is_file()
     print(f'Weights: {args.model_weights} downloaded from S3!')
@@ -179,7 +177,7 @@ local_data_dir = Path('datasets')
 local_data_dir.mkdir(parents=True, exist_ok=True)
 
 if args.download_data:
-    magic_s3_datasets_path = Path('cv-data/person')
+    magic_s3_datasets_path = Path('digitalhub/persdet/datasets')
 
     for dataset in args.download_data:
         local_dataset_path = local_data_dir / dataset        
@@ -188,7 +186,7 @@ if args.download_data:
 
         if not local_dataset_path.is_file():
             print(f'Downloading {dataset} from S3..')
-            s3.Bucket('datasets').download_file(str(s3_dataset_path), str(local_dataset_path))
+            s3.Bucket('public-data').download_file(str(s3_dataset_path), str(local_dataset_path))
             print(f'Datasets: {dataset} downloaded from S3!')
             assert local_dataset_path.is_file()
 
