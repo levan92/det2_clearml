@@ -138,13 +138,17 @@ args = parser.parse_args()
 
 print("Command Line Args:", args)
 
+AWS_ENDPOINT_URL=os.environ.get("AWS_ENDPOINT_URL", "https://130.14.2.121")
+AWS_ACCESS_KEY=os.environ.get("AWS_ACCESS_KEY")
+AWS_SECRET_ACCESS=os.environ.get("AWS_SECRET_ACCESS")
+
 """
 Clearml
 """
 if not args.noclearml:
     # task = Task.init(project_name='persdet2',task_name='Train',task_type='training', output_uri='s3://192.168.56.253:9000/models/snapshots/')
     task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
-    task.set_base_docker("harbor.io/custom/detectron2:v3 --env GIT_SSL_NO_VERIFY=true --env TRAINS_AGENT_GIT_USER=testuser --env TRAINS_AGENT_GIT_PASS=testuser" )
+    task.set_base_docker(f"harbor.io/custom/detectron2:v3 --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
     task.execute_remotely(queue_name="gpu", exit_process=True)
 
 '''
@@ -154,9 +158,9 @@ import boto3
 from botocore.client import Config
 import tarfile
 s3=boto3.resource('s3', 
-        endpoint_url='http://192.168.56.253:9000/',
-        aws_access_key_id='lingevan',
-        aws_secret_access_key=args.awskey,
+        endpoint_url=AWS_ENDPOINT_URL,
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_ACCESS,
         config=Config(signature_version='s3v4'),
         region_name='us-east-1')
 
@@ -193,8 +197,6 @@ if args.download_data:
             tar.extractall(local_data_dir)
             tar.close()
             print('Untarred!')
-
-
 
 '''
 TRAINING
