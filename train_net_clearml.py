@@ -7,16 +7,24 @@ import sys
 import argparse
 from pathlib import Path
 
-CLEARML_PROJECT_NAME = 'persdet2'
-
 '''
 ARGUMENT PARSER
 '''
 
 # args = default_argument_parser().parse_args()
 parser = argparse.ArgumentParser()
+parser.add_argument("--clearml-proj", default="DETECTRON2", help="ClearML Project Name")
 parser.add_argument("--clearml-task-name", default="Task", help="ClearML Task Name")
 parser.add_argument("--clearml-task-type", default="data_processing", help="ClearML Task Type, e.g. training, testing, inference, etc", choices=['training','testing','inference','data_processing','application','monitor','controller','optimizer','service','qc','custom'])
+parser.add_argument("--docker-img", default="harbor.dsta.ai/nvidia/pytorch:21.03-py3", help="Base docker image to pull")
+parser.add_argument("--queue", default="1gpu", help="ClearML Queue")
+parser.add_argument("--clearml-output-uri", help="ClearML Output URI")
+parser.add_argument("--s3-models-bucket", help="S3 Bucket for models")
+parser.add_argument("--s3-models-path", help="S3 Models Path")
+parser.add_argument("--s3-data-bucket", help="S3 Bucket for data")
+parser.add_argument("--s3-data-path", help="S3 Data Path")
+parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
+parser.add_argument("--s3-output-path", help="S3 Path to output")
 parser.add_argument("--config-file", default="", metavar="FILE", help="path to config file")
 parser.add_argument(
     "--resume",
@@ -134,67 +142,57 @@ args = parser.parse_args()
 
 print("Command Line Args:", args)
 
-AWS_ENDPOINT_URL=os.environ.get("AWS_ENDPOINT_URL", "https://130.14.2.121")
+AWS_ENDPOINT_URL=os.environ.get("AWS_ENDPOINT_URL", "https://ecs.dsta.ai")
 AWS_ACCESS_KEY=os.environ.get("AWS_ACCESS_KEY")
 AWS_SECRET_ACCESS=os.environ.get("AWS_SECRET_ACCESS")
+CERT_PATH=os.environ.get("CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt")
 
 """
 Clearml
 """
 if not args.noclearml:
-    # task = Task.init(project_name='persdet2',task_name='Train',task_type='training', output_uri='s3://192.168.56.253:9000/models/snapshots/')
-    # task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri='https://130.14.2.121/public-data/digitalhub/persdet/snapshots/det2')
-    # task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri='s3://130.14.2.121/public-data/digitalhub/persdet/snapshots/det2')
-    task = Task.init(project_name=CLEARML_PROJECT_NAME,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
-    task.set_base_docker(f"harbor.dsta.ai/public/detectron2:v3 --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
-    task.execute_remotely(queue_name="1gpu", exit_process=True)
+    task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri=args.clearml_output_uri)
+    task.set_base_docker(f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
+    task.execute_remotely(queue_name=args.queue, exit_process=True)
 
 '''
 S3 downloading
 '''
 import boto3
 from botocore.client import Config
-import tarfile
+
+from utils import download_dir_from_s3, upload_dir_to_s3
+
 s3=boto3.resource('s3', 
         endpoint_url=AWS_ENDPOINT_URL,
         aws_access_key_id=AWS_ACCESS_KEY,
         aws_secret_access_key=AWS_SECRET_ACCESS,
         config=Config(signature_version='s3v4'),
-        region_name='us-east-1')
+        region_name='us-east-1',
+        verify=CERT_PATH
+        )
 
 if args.model_weights:
-    magic_weights_path = Path('digitalhub/persdet/models')
-    s3_weights_path = magic_weights_path / Path(args.model_weights)
+    assert args.s3_models_bucket
+    assert args.s3_models_path
+    s3_models_parent = Path(args.s3_models_path)
+    s3_weights_path = s3_models_parent / Path(args.model_weights)
     local_weights_path = 'weights' / Path(args.model_weights)
     local_weights_path.parent.mkdir(parents=True, exist_ok=True)
-    s3.Bucket('public-data').download_file(str(s3_weights_path), str(local_weights_path))
-
+    s3.Bucket(args.s3_models_bucket).download_file(str(s3_weights_path), str(local_weights_path))
     assert local_weights_path.is_file()
     print(f'Weights: {args.model_weights} downloaded from S3!')
 
-
 local_data_dir = Path('datasets')
 local_data_dir.mkdir(parents=True, exist_ok=True)
-
 if args.download_data:
-    magic_s3_datasets_path = Path('digitalhub/persdet/datasets')
-
+    assert args.s3_data_bucket
+    assert args.s3_data_path
+    s3_dataset_parent = Path(args.s3_data_path)
     for dataset in args.download_data:
         local_dataset_path = local_data_dir / dataset        
-
-        s3_dataset_path = magic_s3_datasets_path / dataset
-
-        if not local_dataset_path.is_file():
-            print(f'Downloading {dataset} from S3..')
-            s3.Bucket('public-data').download_file(str(s3_dataset_path), str(local_dataset_path))
-            print(f'Datasets: {dataset} downloaded from S3!')
-            assert local_dataset_path.is_file()
-
-            print('Untarring..')
-            tar = tarfile.open(local_dataset_path)
-            tar.extractall(local_data_dir)
-            tar.close()
-            print('Untarred!')
+        s3_dataset_path = s3_dataset_parent / dataset
+        download_dir_from_s3(s3, args.s3_data_bucket, s3_dataset_path, local_dataset_path, untar=True)
 
 '''
 TRAINING
@@ -265,3 +263,9 @@ launch(
     dist_url=args.dist_url,
     args=(args,),
 )
+
+'''
+Upload Outputs
+'''
+s3_output_path = Path(args.s3_output_path) / f'{args.clearml_task_name}'
+upload_dir_to_s3(s3, args.s3_output_bucket, args.output_dir, s3_output_path)
