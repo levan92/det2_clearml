@@ -6,6 +6,7 @@ import os
 import sys
 import argparse
 from pathlib import Path
+from copy import deepcopy
 
 '''
 ARGUMENT PARSER
@@ -62,11 +63,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--model-weights",
-    help="MODEL.WEIGHTS"
+    help="MODEL.WEIGHTS | if multiple are given, will generate test for each (eval mode only). This assumes all model weights are of same architecture as given config yaml file.",
+    nargs='*'
 )
 parser.add_argument(
     "--output-dir",
-    help="OUTPUT_DIR"
+    help="OUTPUT_DIR | Multiple must be given if model weights are multiple as well. Should have same length. Respective inference res from each model weight run will output to respective output dir. Defaults to outputs.",
+    nargs='*'
 )
 parser.add_argument(
     "--datasets-train",
@@ -147,6 +150,14 @@ AWS_ACCESS_KEY=os.environ.get("AWS_ACCESS_KEY")
 AWS_SECRET_ACCESS=os.environ.get("AWS_SECRET_ACCESS")
 CERT_PATH=os.environ.get("CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt")
 
+base_output_dir = './output'
+if args.model_weights and len(args.model_weights) > 1:
+    assert args.eval_only,'Only give multiple model weights if on eval mode'
+    assert len(args.output_dir) == len(args.model_weights),'Multiple output dir must be of same length to multiple model weights.'
+    output_dirs = [ Path(base_output_dir)/opd for opd in args.output_dir ]
+else:
+    output_dirs = [ base_output_dir ]
+
 """
 Clearml
 """
@@ -172,16 +183,21 @@ s3=boto3.resource('s3',
         verify=CERT_PATH
         )
 
-if args.model_weights:
+# if args.model_weights:
+local_weights_paths = []
+for model_weight in args.model_weights:
     assert args.s3_models_bucket
     assert args.s3_models_path
     s3_models_parent = Path(args.s3_models_path)
-    s3_weights_path = s3_models_parent / Path(args.model_weights)
-    local_weights_path = 'weights' / Path(args.model_weights)
+    # s3_weights_path = s3_models_parent / Path(args.model_weights)
+    s3_weights_path = s3_models_parent / Path(model_weight)
+    # local_weights_path = 'weights' / Path(args.model_weights)
+    local_weights_path = 'weights' / Path(model_weight)
     local_weights_path.parent.mkdir(parents=True, exist_ok=True)
     s3.Bucket(args.s3_models_bucket).download_file(str(s3_weights_path), str(local_weights_path))
     assert local_weights_path.is_file()
-    print(f'Weights: {args.model_weights} downloaded from S3!')
+    local_weights_paths.append(local_weights_path)
+    print(f'Weights: {model_weight} downloaded from S3!')
 
 local_data_dir = Path('datasets')
 local_data_dir.mkdir(parents=True, exist_ok=True)
@@ -237,8 +253,6 @@ datasets_to_reg = list(set(datasets_to_reg))
 for dataset_to_reg in datasets_to_reg:
     register_datasets(dataset_to_reg, local_data_dir)
 
-extend_opts(args.opts, 'MODEL.WEIGHTS', str(local_weights_path))
-extend_opts(args.opts, 'OUTPUT_DIR', args.output_dir)
 extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
 extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
 extend_opts(args.opts, 'TEST.EVAL_PERIOD', args.test_eval_period)
@@ -255,17 +269,22 @@ extend_opts(args.opts, 'INPUT.MAX_SIZE_TRAIN', args.max_size_train)
 extend_opts(args.opts, 'INPUT.MIN_SIZE_TEST', args.min_size_test)
 extend_opts(args.opts, 'INPUT.MAX_SIZE_TEST', args.max_size_test)
 
-launch(
-    main,
-    args.num_gpus,
-    num_machines=args.num_machines,
-    machine_rank=args.machine_rank,
-    dist_url=args.dist_url,
-    args=(args,),
-)
+for local_wts, outputdir in zip(local_weights_paths, output_dirs):
+    this_args = deepcopy(args)
+    extend_opts(this_args.opts, 'MODEL.WEIGHTS', str(local_wts))
+    extend_opts(this_args.opts, 'OUTPUT_DIR', str(outputdir))
+
+    launch(
+        main,
+        this_args.num_gpus,
+        num_machines=this_args.num_machines,
+        machine_rank=this_args.machine_rank,
+        dist_url=this_args.dist_url,
+        args=(this_args,),
+    )
 
 '''
 Upload Outputs
 '''
 s3_output_path = Path(args.s3_output_path) / f'{args.clearml_task_name}'
-upload_dir_to_s3(s3, args.s3_output_bucket, args.output_dir, s3_output_path)
+upload_dir_to_s3(s3, args.s3_output_bucket, base_output_dir, s3_output_path)
