@@ -25,6 +25,21 @@ parser.add_argument("--s3-data-bucket", help="S3 Bucket for data")
 parser.add_argument("--s3-data-path", help="S3 Data Path")
 parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
 parser.add_argument("--s3-output-path", help="S3 Path to output")
+parser.add_argument(
+    "--custom-dsnames",
+    help='Names of custom datasets (must match to those in args.datasets_train and args.datasets_test). Only for custom datasets that does not conform to repo dataset assumptions.',
+    nargs='*'
+    )
+parser.add_argument(
+    "--custom-cocojsons",
+    help='Paths to coco json file. Only for custom datasets that does not conform to repo dataset assumptions.',
+    nargs='*'
+    )
+parser.add_argument(
+    "--custom-imgroots",
+    help='Paths to img roots. Only for custom datasets that does not conform to repo dataset assumptions.',
+    nargs='*'
+    )
 parser.add_argument("--config-file", default="", metavar="FILE", help="path to config file")
 parser.add_argument(
     "--resume",
@@ -215,11 +230,21 @@ from detectron2.engine import launch
 from trainer import main
 from utils import register_datasets, extend_opts, parse_datasets_args
 
+# Register the custom datasets that don't conform to dataset format assumptions first
+already_reged = []
+if args.custom_dsnames:
+    assert len(args.custom_dsnames)==len(args.custom_cocojsons)
+    assert len(args.custom_dsnames)==len(args.custom_imgroots)
+    for dsname, cjson, imroot in zip(args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots):
+        register_datasets(dsname, json_path=cjson, dataset_image_root=imroot)
+        already_reged.append(dsname)
+
+# Then register remaining of train and test sets, assuming remainders all conform to dataset format.
 datasets_to_reg = []
 datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
 datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
-for dataset_to_reg in list(set(datasets_to_reg)):
-    register_datasets(dataset_to_reg, local_data_dir)
+for dataset_to_reg in list(set(datasets_to_reg)-set(already_reged)):
+    register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
 
 extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
 extend_opts(args.opts, 'DATASETS.TEST', datasets_test)

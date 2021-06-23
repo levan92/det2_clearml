@@ -1,8 +1,8 @@
 import os
 import ast
 import tarfile
+import zipfile
 from pathlib import Path
-
 
 def download_dir_from_s3(s3_resource, bucket_name, remote_dir_name, local_dir, untar=True):
     buck = s3_resource.Bucket(bucket_name)
@@ -13,12 +13,14 @@ def download_dir_from_s3(s3_resource, bucket_name, remote_dir_name, local_dir, u
         if not local_fp.is_file():
             print(f'Downloading {obj.key} from S3..')
             buck.download_file(obj.key, str(local_fp))
-            if local_fp.suffix in ['.tar','.tar.gz','.tgz']:
+            if local_fp.suffix in ['.tar','.gz','.tgz']:
                 print('Untarring..')
                 tar = tarfile.open(local_fp)
                 tar.extractall(local_dir)
                 tar.close()
-
+            elif local_fp.suffix in ['.zip']:
+                with zipfile.ZipFile(local_fp, 'r') as zip_ref:
+                    zip_ref.extractall(local_dir)
 
 def upload_dir_to_s3(s3_resource, bucket_name, local_dir, remote_dir):
     buck = s3_resource.Bucket(bucket_name)
@@ -33,15 +35,21 @@ def upload_dir_to_s3(s3_resource, bucket_name, local_dir, remote_dir):
 
 from detectron2.data.datasets import register_coco_instances
 
-def register_datasets(dataset_name, local_data_dir):
-    local_data_dir = Path(local_data_dir)
-    set_name, phase = dataset_name.rsplit('_',1)
-    print('Registering', set_name, phase)
-    dataset_dir = local_data_dir / set_name
-    assert dataset_dir.is_dir(),dataset_dir
-    dataset_image_root = dataset_dir / 'images'
+def register_datasets(dataset_name, local_data_dir = None, json_path = None, dataset_image_root = None):
+    assert local_data_dir or json_path
+    if local_data_dir is None:
+        print('Registering', dataset_name)
+        json_path = Path(json_path)
+        dataset_image_root = Path(dataset_image_root)
+    else:
+        local_data_dir = Path(local_data_dir)
+        set_name, phase = dataset_name.rsplit('_',1)
+        print('Registering', set_name, phase)
+        dataset_dir = local_data_dir / set_name
+        assert dataset_dir.is_dir(),dataset_dir
+        dataset_image_root = dataset_dir / 'images'
+        json_path = dataset_dir / f'{phase}.json'
     assert dataset_image_root.is_dir(),dataset_image_root
-    json_path = dataset_dir / f'{phase}.json'
     assert json_path.is_file(),json_path
     register_coco_instances(dataset_name, {}, json_path, dataset_image_root)
 
