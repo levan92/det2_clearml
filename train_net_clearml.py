@@ -12,7 +12,6 @@ from copy import deepcopy
 ARGUMENT PARSER
 '''
 
-# args = default_argument_parser().parse_args()
 parser = argparse.ArgumentParser()
 parser.add_argument("--clearml-proj", default="DETECTRON2", help="ClearML Project Name")
 parser.add_argument("--clearml-task-name", default="Task", help="ClearML Task Name")
@@ -189,9 +188,7 @@ for model_weight in args.model_weights:
     assert args.s3_models_bucket
     assert args.s3_models_path
     s3_models_parent = Path(args.s3_models_path)
-    # s3_weights_path = s3_models_parent / Path(args.model_weights)
     s3_weights_path = s3_models_parent / Path(model_weight)
-    # local_weights_path = 'weights' / Path(args.model_weights)
     local_weights_path = 'weights' / Path(model_weight)
     local_weights_path.parent.mkdir(parents=True, exist_ok=True)
     s3.Bucket(args.s3_models_bucket).download_file(str(s3_weights_path), str(local_weights_path))
