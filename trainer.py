@@ -38,7 +38,7 @@ from detectron2.data import build_detection_train_loader, build_detection_test_l
 
 from data import AugDatasetMapper
 from models import resnet_IN_fpn
-from config import add_IN_config
+from config import add_custom_configs
 
 class Trainer(DefaultTrainer):
     """
@@ -109,7 +109,7 @@ def setup(args, freeze=True):
     Create configs and perform basic setups.
     """
     cfg = get_cfg()
-    add_IN_config(cfg)
+    add_custom_configs(cfg)
     cfg.merge_from_file(args.config_file)
     if hasattr(args, 'opts') and args.opts is not None:
         cfg.merge_from_list(args.opts)

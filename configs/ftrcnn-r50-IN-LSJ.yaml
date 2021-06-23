@@ -1,4 +1,4 @@
-_BASE_: "../COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+_BASE_: "COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
 DATALOADER:
     FILTER_EMPTY_ANNOTATIONS: False
 MODEL:
@@ -39,12 +39,12 @@ INPUT:
     # Maximum size of the side of the image during testing
     MAX_SIZE_TEST: 1333
     CROP:
-        ENABLED: False
+        ENABLED: True
         TYPE: "relative_range"
-        SIZE: [0.5, 1.0]
+        SIZE: [0.8, 1.0]
     LARGE_SCALE_JITTER:
         ENABLED: True
-        MIN_SCALE: 0.2
+        MIN_SCALE: 0.5
         MAX_SCALE: 2.0
 TEST:
     EVAL_PERIOD: 5000

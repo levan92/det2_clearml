@@ -6,10 +6,10 @@ import torch
 from fvcore.common.file_io import PathManager
 from PIL import Image
 
-# from . import detection_utils as utils
-# from . import transforms as T
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
+
+from .new_augs import LargeScaleJitter
 
 def build_transform_gen(cfg, is_train):
     """
@@ -34,9 +34,26 @@ def build_transform_gen(cfg, is_train):
 
     logger = logging.getLogger(__name__)
     tfm_gens = []
-    tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+    
     if is_train:
-        tfm_gens.append(T.RandomFlip())
+        tfm_gens.append(T.RandomFlip(prob=0.5, horizontal=True))
+
+    if is_train and cfg.INPUT.LARGE_SCALE_JITTER.ENABLED:
+        tfm_gens.append(                
+            LargeScaleJitter(
+                    min_scale = cfg.INPUT.LARGE_SCALE_JITTER.MIN_SCALE,
+                    max_scale = cfg.INPUT.LARGE_SCALE_JITTER.MAX_SCALE,
+                    short_edge_length = min_size, 
+                    max_size = max_size, 
+                    sample_style= sample_style, 
+                    interp = Image.BILINEAR,
+                    pad_value = 128.0
+                )
+            )
+    else:
+       tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+
+    if is_train:
         tfm_gens.extend([     
             T.RandomBrightness(0.5, 1.5),
             T.RandomContrast(0.5, 1.5),
