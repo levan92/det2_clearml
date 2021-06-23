@@ -210,9 +210,6 @@ if args.download_data:
 '''
 TRAINING
 '''
-import ast
-
-from detectron2.data.datasets import register_coco_instances
 from detectron2.engine import launch
 
 from trainer import main
