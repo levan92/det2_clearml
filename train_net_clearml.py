@@ -171,7 +171,7 @@ S3 downloading
 import boto3
 from botocore.client import Config
 
-from utils import download_dir_from_s3, upload_dir_to_s3
+from utils import download_dir_from_s3, parse_datasets_args, upload_dir_to_s3
 
 s3=boto3.resource('s3', 
         endpoint_url=AWS_ENDPOINT_URL,
@@ -216,38 +216,12 @@ from detectron2.data.datasets import register_coco_instances
 from detectron2.engine import launch
 
 from trainer import main
-
-def register_datasets(dataset_name, local_data_dir):
-    set_name, phase = dataset_name.rsplit('_',1)
-    print('Registering', set_name, phase)
-    dataset_dir = local_data_dir / set_name
-    assert dataset_dir.is_dir(),dataset_dir
-    dataset_image_root = dataset_dir / 'images'
-    assert dataset_image_root.is_dir(),dataset_image_root
-    json_path = dataset_dir / f'{phase}.json'
-    assert json_path.is_file(),json_path
-    register_coco_instances(dataset_name, {}, json_path, dataset_image_root)
-
-def extend_opts(opts, cfg_param, value):
-    if value is not None:
-        opts.extend([cfg_param,value])
-
+from utils import register_datasets, extend_opts
 
 datasets_to_reg = []
-if args.datasets_train:
-    datasets_train = ast.literal_eval(args.datasets_train)
-    datasets_to_reg.extend(datasets_train)
-else:
-    datasets_train = None
-
-if args.datasets_test:
-    datasets_test = ast.literal_eval(args.datasets_test)
-    datasets_to_reg.extend(datasets_test)
-else:
-    datasets_test = None
-
-datasets_to_reg = list(set(datasets_to_reg))
-for dataset_to_reg in datasets_to_reg:
+datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
+datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
+for dataset_to_reg in list(set(datasets_to_reg)):
     register_datasets(dataset_to_reg, local_data_dir)
 
 extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
