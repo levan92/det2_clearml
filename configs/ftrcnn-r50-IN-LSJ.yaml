@@ -21,12 +21,12 @@ SOLVER:
     # BASE_LR: 0.002
     BASE_LR: 0.01
     # BASE_LR: 0.005
-    STEPS: (30000, 60000, 90000)
-    # STEPS: (35000, 65000, 95000)
-    # STEPS: (210000, 250000)
-    MAX_ITER: 200000
-    WARMUP_ITERS: 50
-    # WARMUP_ITERS: 5000
+    # STEPS: (30000, 60000, 90000)
+    # MAX_ITER: 200000  
+    STEPS: (210000, 250000)
+    MAX_ITER: 270000
+    # WARMUP_ITERS: 50
+    WARMUP_ITERS: 5000
 INPUT:
     # Size of the smallest side of the image during training
     MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
