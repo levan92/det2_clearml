@@ -171,7 +171,7 @@ S3 downloading
 import boto3
 from botocore.client import Config
 
-from utils import download_dir_from_s3, parse_datasets_args, upload_dir_to_s3
+from utils import download_dir_from_s3, upload_dir_to_s3
 
 s3=boto3.resource('s3', 
         endpoint_url=AWS_ENDPOINT_URL,
@@ -216,7 +216,7 @@ from detectron2.data.datasets import register_coco_instances
 from detectron2.engine import launch
 
 from trainer import main
-from utils import register_datasets, extend_opts
+from utils import register_datasets, extend_opts, parse_datasets_args
 
 datasets_to_reg = []
 datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
