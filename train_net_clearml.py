@@ -145,8 +145,20 @@ parser.add_argument(
     "--max-size-test",
     help="INPUT.MAX_SIZE_TEST, default: 1333"
 )
-
-
+parser.add_argument(
+    "--disable-crop",
+    help="INPUT.CROP.ENABLED, default: enabled",
+    action='store_false'
+)
+parser.add_argument(
+    "--crop-size",
+    help="INPUT.CROP.SIZE, default: [0.5,1.0]"
+)
+parser.add_argument(
+    "--lsj",
+    help="INPUT.LARGE_SCALE_JITTER.ENABLED, default: disabled",
+    action='store_true'
+)
 parser.add_argument(
     "opts",
     help="Modify config options by adding 'KEY VALUE' pairs at the end of the command. "
@@ -261,6 +273,9 @@ extend_opts(args.opts, 'INPUT.MIN_SIZE_TRAIN', args.min_size_train)
 extend_opts(args.opts, 'INPUT.MAX_SIZE_TRAIN', args.max_size_train)
 extend_opts(args.opts, 'INPUT.MIN_SIZE_TEST', args.min_size_test)
 extend_opts(args.opts, 'INPUT.MAX_SIZE_TEST', args.max_size_test)
+extend_opts(args.opts, 'INPUT.CROP.ENABLED', args.disable_crop)
+extend_opts(args.opts, 'INPUT.CROP.SIZE', args.crop_size)
+extend_opts(args.opts, 'INPUT.LARGE_SCALE_JITTER.ENABLED', args.lsj)
 
 for local_wts, outputdir in zip(local_weights_paths, output_dirs):
     this_args = deepcopy(args)
