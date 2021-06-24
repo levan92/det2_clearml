@@ -6,7 +6,7 @@ from pathlib import Path
 
 def download_dir_from_s3(s3_resource, bucket_name, remote_dir_name, local_dir, untar=True):
     buck = s3_resource.Bucket(bucket_name)
-    for obj in buck.objects.filter(Prefix=str(remote_dir_name)):
+    for obj in buck.objects.filter(Prefix=str(remote_dir_name)+'/'):
         remote_rel_path = Path(obj.key).relative_to(remote_dir_name)
         local_fp = local_dir / remote_rel_path
         local_fp.parent.mkdir(parents=True, exist_ok=True)
@@ -19,6 +19,7 @@ def download_dir_from_s3(s3_resource, bucket_name, remote_dir_name, local_dir, u
                 tar.extractall(local_dir)
                 tar.close()
             elif local_fp.suffix in ['.zip']:
+                print('Unzipping..')
                 with zipfile.ZipFile(local_fp, 'r') as zip_ref:
                     zip_ref.extractall(local_dir)
 
