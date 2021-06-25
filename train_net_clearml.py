@@ -76,6 +76,10 @@ parser.add_argument(
     action='store_true'
 )
 parser.add_argument(
+    "--num-classes",
+    help="MODEL.ROI_HEADS.NUM_CLASSES"
+)
+parser.add_argument(
     "--model-weights",
     help="MODEL.WEIGHTS | if multiple are given, will generate test for each (eval mode only). This assumes all model weights are of same architecture as given config yaml file.",
     nargs='*'
@@ -258,6 +262,7 @@ datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
 for dataset_to_reg in list(set(datasets_to_reg)-set(already_reged)):
     register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
 
+extend_opts(args.opts, 'MODEL.ROI_HEADS.NUM_CLASSES', args.num_classes)
 extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
 extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
 extend_opts(args.opts, 'TEST.EVAL_PERIOD', args.test_eval_period)
