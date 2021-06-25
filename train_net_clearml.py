@@ -192,7 +192,7 @@ else:
 Clearml
 """
 if not args.noclearml:
-    task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri=args.clearml_output_uri)
+    task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
     task.set_base_docker(f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
     task.execute_remotely(queue_name=args.queue, exit_process=True)
 
