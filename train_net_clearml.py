@@ -179,6 +179,7 @@ AWS_ENDPOINT_URL=os.environ.get("AWS_ENDPOINT_URL", "https://ecs.dsta.ai")
 AWS_ACCESS_KEY=os.environ.get("AWS_ACCESS_KEY")
 AWS_SECRET_ACCESS=os.environ.get("AWS_SECRET_ACCESS")
 CERT_PATH=os.environ.get("CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt")
+CERT_DL_URL='http://gitlab.dsta.ai/ai-platform/getting-started/raw/master/config/ca.dsta.ai.crt'
 
 base_output_dir = './output'
 if args.model_weights and len(args.model_weights) > 1:
@@ -199,10 +200,15 @@ if not args.noclearml:
 '''
 S3 downloading
 '''
+import wget
 import boto3
 from botocore.client import Config
 
 from utils import download_dir_from_s3, upload_dir_to_s3
+
+if CERT_DL_URL:
+    wget.download(CERT_DL_URL)
+    CERT_PATH = Path(CERT_DL_URL).name
 
 s3=boto3.resource('s3', 
         endpoint_url=AWS_ENDPOINT_URL,

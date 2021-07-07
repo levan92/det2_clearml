@@ -49,6 +49,58 @@ class Trainer(DefaultTrainer):
     "tools/plain_train_net.py" as an example.
     """
 
+    def build_hooks(self):
+        """
+        Build a list of default hooks, including timing, evaluation,
+        checkpointing, lr scheduling, precise BN, writing events.
+
+        Returns:
+            list[HookBase]:
+        """
+        cfg = self.cfg.clone()
+        cfg.defrost()
+        cfg.DATALOADER.NUM_WORKERS = 0  # save some memory and time for PreciseBN
+
+        ret = [
+            hooks.IterationTimer(),
+            hooks.LRScheduler(),
+            hooks.PreciseBN(
+                # Run at the same freq as (but before) evaluation.
+                cfg.TEST.EVAL_PERIOD,
+                self.model,
+                # Build a new data loader to not affect training
+                self.build_train_loader(cfg),
+                cfg.TEST.PRECISE_BN.NUM_ITER,
+            )
+            if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model)
+            else None,
+        ]
+
+        # Do PreciseBN before checkpointer, because it updates the model and need to
+        # be saved by checkpointer.
+        # This is not always the best: if checkpointing has a different frequency,
+        # some checkpoints may have more precise statistics than others.
+        if comm.is_main_process():
+            ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
+
+        def test_and_save_results():
+            self._last_eval_results = self.test(self.cfg, self.model)
+            return self._last_eval_results
+
+        # Do evaluation after checkpointer, because then if it fails,
+        # we can use the saved checkpoint to debug.
+        ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
+
+        if comm.is_main_process() and cfg.SOLVER.BEST_CHECKPOINTER.ENABLED:
+            ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC))
+
+        if comm.is_main_process():
+            # Here the default print/log frequency of each writer is used.
+            # run writers in the end, so that evaluation metrics are written
+            ret.append(hooks.PeriodicWriter(self.build_writers(), period=20))
+        return ret
+
+
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
         return build_detection_test_loader(cfg, dataset_name, mapper=AugDatasetMapper(cfg, False))
