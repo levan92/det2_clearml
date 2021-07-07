@@ -8,6 +8,8 @@ def download_dir_from_s3(s3_resource, bucket_name, remote_dir_name, local_dir, u
     buck = s3_resource.Bucket(bucket_name)
     for obj in buck.objects.filter(Prefix=str(remote_dir_name)+'/'):
         remote_rel_path = Path(obj.key).relative_to(remote_dir_name)
+        if str(remote_rel_path)=='.':
+            continue
         local_fp = local_dir / remote_rel_path
         local_fp.parent.mkdir(parents=True, exist_ok=True)
         if not local_fp.is_file():
