@@ -49,6 +49,10 @@ class Trainer(DefaultTrainer):
     "tools/plain_train_net.py" as an example.
     """
 
+    def __init__(self, cfg, disable_period_checkpoint=False):
+        self.disable_period_checkpoint = disable_period_checkpoint
+        super().__init__(cfg)
+
     def build_hooks(self):
         """
         Build a list of default hooks, including timing, evaluation,
@@ -80,7 +84,7 @@ class Trainer(DefaultTrainer):
         # be saved by checkpointer.
         # This is not always the best: if checkpointing has a different frequency,
         # some checkpoints may have more precise statistics than others.
-        if comm.is_main_process():
+        if not self.disable_period_checkpoint and comm.is_main_process():
             ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.CHECKPOINT_PERIOD))
 
         def test_and_save_results():
@@ -187,6 +191,6 @@ def main(args):
     If you'd like to do anything fancier than the standard training logic,
     consider writing your own training loop or subclassing the trainer.
     """
-    trainer = Trainer(cfg)
+    trainer = Trainer(cfg, disable_period_checkpoint=args.disable_period_checkpoint)
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
