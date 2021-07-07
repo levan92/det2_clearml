@@ -24,7 +24,7 @@ from fvcore.nn.precise_bn import get_bn_modules
 
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.config import get_cfg
+from detectron2.config import get_cfg, CfgNode
 from detectron2.data import MetadataCatalog
 from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, hooks, launch
 from detectron2.evaluation import (
@@ -168,7 +168,7 @@ class Trainer(DefaultTrainer):
         return res
 
 
-def setup(args):
+def setup(args, cl_task=None):
     """
     Create configs and perform basic setups.
     """
@@ -176,29 +176,18 @@ def setup(args):
     add_custom_configs(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+
+    if cl_task:
+        # cl_task.connect(cfg)
+        cl_dict = cl_task.connect_configuration(name='hyperparams', configuration=cfg)
+        cfg = CfgNode(init_dict=cl_dict)
+
+    cfg.freeze()
     default_setup(cfg, args)
     return cfg
 
-
-def main(args):
-    cfg = setup(args)
-
-    print('before connect, imgs per batch', cfg.SOLVER.IMS_PER_BATCH)
-
-    from clearml import Task
-    task = Task.init(project_name='det2', task_name='try3')
-    task.connect(cfg)
-
-    task.connect_configuration(name='hyparams', configuration=cfg)
-
-    import yaml
-    task.connect_configuration(name='dicty', configuration=yaml.load(cfg.dump()))
-
-    cfg.freeze()
-
-    print('after connect, imgs per batch', cfg.SOLVER.IMS_PER_BATCH)
-
-    exit()
+def main(args, cl_task):
+    cfg = setup(args, cl_task=cl_task)
 
     if args.eval_only:
         model = Trainer.build_model(cfg)
@@ -228,12 +217,22 @@ def main(args):
 
 if __name__ == "__main__":
     from detectron2.data.datasets import register_coco_instances
+    from clearml import Task
 
-    args = default_argument_parser().parse_args()
+    parser = default_argument_parser()
+
+    parser.add_argument("--clearml-proj", default="det2", help="ClearML Project Name")
+    parser.add_argument("--clearml-task-name", default="Task", help="ClearML Task Name")
+    parser.add_argument("--clearml-task-type", default="data_processing", help="ClearML Task Type, e.g. training, testing, inference, etc", choices=['training','testing','inference','data_processing','application','monitor','controller','optimizer','service','qc','custom'])
+    
+    args = parser.parse_args()
+    
     print("Command Line Args:", args)
 
     register_coco_instances("coco_train", {}, '/media/dh/HDD/coco/annotations/instances_train2017.json', '/media/dh/HDD/coco/train2017')
     register_coco_instances("coco_val", {}, '//media/dh/HDD/coco/smallval/instances_val2017.json', '/media/dh/HDD/coco/smallval/images')
+
+    cl_task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
 
     launch(
         main,
@@ -241,5 +240,5 @@ if __name__ == "__main__":
         num_machines=args.num_machines,
         machine_rank=args.machine_rank,
         dist_url=args.dist_url,
-        args=(args,),
+        args=(args, cl_task),
     )
