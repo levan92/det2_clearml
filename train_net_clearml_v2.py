@@ -186,7 +186,7 @@ def main(args):
     print('before connect, imgs per batch', cfg.SOLVER.IMS_PER_BATCH)
 
     from clearml import Task
-    task = Task.init(project_name='det2', task_name='try1')
+    task = Task.init(project_name='det2', task_name='try3')
     task.connect(cfg)
 
     task.connect_configuration(name='hyparams', configuration=cfg)
