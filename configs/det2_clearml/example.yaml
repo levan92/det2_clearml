@@ -1,0 +1,51 @@
+_BASE_: "../COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"
+DATASETS:
+    TRAIN: ('coco_train',)
+    TEST: ('coco_val',)
+OUTPUT_DIR: "./output"
+# DATALOADER:
+    # FILTER_EMPTY_ANNOTATIONS: False
+MODEL:
+    # INSTANCE_NORM: True
+    # BACKBONE:
+    #     NAME: "build_resnet_IN_fpn_backbone"
+    ROI_HEADS:
+        NUM_CLASSES: 80
+    # ANCHOR_GENERATOR:
+        # SIZES: [[32], [64], [128], [256], [512]]
+        # ASPECT_RATIOS: [[0.5, 1.0, 2.0]]
+SOLVER:
+    IMS_PER_BATCH: 2
+    BASE_LR: 0.01
+    STEPS: (210000, 250000)
+    MAX_ITER: 270000
+    PERIODIC_CHECKPOINTER:
+        ENABLED: False
+        PERIOD: 5000
+    BEST_CHECKPOINTER:
+        ENABLED: True
+        # METRIC: "total_loss"
+        # MODE: "min"
+        METRIC: "bbox/AP50"
+        MODE: "max"
+TEST:
+    EVAL_PERIOD: 100
+INPUT:
+    # Size of the smallest side of the image during training
+    MIN_SIZE_TRAIN: (640, 672, 704, 736, 768, 800)
+    # Sample size of smallest side by choice or random selection from range give by
+    MIN_SIZE_TRAIN_SAMPLING: "choice"
+    # Maximum size of the side of the image during training
+    MAX_SIZE_TRAIN: 1333
+    # Size of the smallest side of the image during testing. Set to zero to disable resize in testing.
+    MIN_SIZE_TEST: 800
+    # Maximum size of the side of the image during testing
+    MAX_SIZE_TEST: 1333
+    CROP:
+        ENABLED: True
+        TYPE: "relative_range"
+        SIZE: [0.5, 1.0]
+    LARGE_SCALE_JITTER:
+        ENABLED: False
+        MIN_SCALE: 0.5
+        MAX_SCALE: 2.0

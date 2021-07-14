@@ -1,42 +1,18 @@
-import os
 import ast
-import tarfile
-import zipfile
 from pathlib import Path
 
-def download_dir_from_s3(s3_resource, bucket_name, remote_dir_name, local_dir, untar=True):
-    buck = s3_resource.Bucket(bucket_name)
-    for obj in buck.objects.filter(Prefix=str(remote_dir_name)+'/'):
-        remote_rel_path = Path(obj.key).relative_to(remote_dir_name)
-        if str(remote_rel_path)=='.':
-            continue
-        local_fp = local_dir / remote_rel_path
-        local_fp.parent.mkdir(parents=True, exist_ok=True)
-        if not local_fp.is_file():
-            print(f'Downloading {obj.key} from S3..')
-            buck.download_file(obj.key, str(local_fp))
-            if local_fp.suffix in ['.tar','.gz','.tgz']:
-                print('Untarring..')
-                tar = tarfile.open(local_fp)
-                tar.extractall(local_dir)
-                tar.close()
-            elif local_fp.suffix in ['.zip']:
-                print('Unzipping..')
-                with zipfile.ZipFile(local_fp, 'r') as zip_ref:
-                    zip_ref.extractall(local_dir)
-
-def upload_dir_to_s3(s3_resource, bucket_name, local_dir, remote_dir):
-    buck = s3_resource.Bucket(bucket_name)
-
-    for root,dirs,files in os.walk(str(local_dir)):
-        for file in files: 
-            local_fp = Path(root)/file
-            rel_path = Path(root).relative_to(local_dir)
-            remote_fp = Path(remote_dir)/ rel_path / file
-            print(f'Uploading {local_fp} to S3 {remote_dir}')
-            buck.upload_file(str(local_fp), str(remote_fp))
-
 from detectron2.data.datasets import register_coco_instances
+
+def parse_datasets_args(ds_args, datasets_to_reg):
+    if ds_args:
+        if ds_args.startswith('('):
+            ds = ast.literal_eval(ds_args)
+        else:
+            ds = (ds_args,)
+        datasets_to_reg.extend(ds)
+    else:
+        ds = None
+    return ds
 
 def register_datasets(dataset_name, local_data_dir = None, json_path = None, dataset_image_root = None):
     assert local_data_dir or json_path
@@ -59,17 +35,6 @@ def register_datasets(dataset_name, local_data_dir = None, json_path = None, dat
 def extend_opts(opts, cfg_param, value):
     if value is not None:
         opts.extend([cfg_param,value])
-
-def parse_datasets_args(ds_args, datasets_to_reg):
-    if ds_args:
-        if ds_args.startswith('('):
-            ds = ast.literal_eval(ds_args)
-        else:
-            ds = (ds_args,)
-        datasets_to_reg.extend(ds)
-    else:
-        ds = None
-    return ds
 
 import cv2
 from detectron2.utils.visualizer import Visualizer
