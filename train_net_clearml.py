@@ -239,7 +239,6 @@ if __name__ == "__main__":
     from utils.det2_helper import register_datasets, parse_datasets_args, extend_opts
 
     parser = default_argument_parser()
-
     parser.add_argument("--skip-clearml", help='flag to entirely skip any clearml action.', action='store_true')
     ## CLEARML ARGS
     parser.add_argument("--clearml-proj", default="det2", help="ClearML Project Name")
@@ -247,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("--clearml-task-type", default="data_processing", help="ClearML Task Type, e.g. training, testing, inference, etc", choices=['training','testing','inference','data_processing','application','monitor','controller','optimizer','service','qc','custom'])
     parser.add_argument("--docker-img", default="harbor.dsta.ai/nvidia/pytorch:21.03-py3", help="Base docker image to pull")
     parser.add_argument("--queue", default="1gpu", help="ClearML Queue")
-
+    ### S3
     parser.add_argument("--skip-s3", help='flag to entirely skip any s3 action.', action='store_true')
     ## DOWNLOAD MODELS ARGS
     parser.add_argument(
@@ -257,7 +256,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--s3-models-bucket", help="S3 Bucket for models")
     parser.add_argument("--s3-models-path", help="S3 Models Path")
-
     ## DOWNLOAD DATA ARGS
     parser.add_argument(
         "--download-data",
@@ -290,18 +288,16 @@ if __name__ == "__main__":
         "--datasets-test",
         help="DATASETS.TEST"
     )
-
     ## UPLOAD OUTPUT ARGS
     parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
     parser.add_argument("--s3-output-path", help="S3 Path to output")
-
     args = parser.parse_args()
     print("Command Line Args:", args)
 
+    '''
+    S3 handling to download weights and datasets
+    '''    
     if not args.skip_s3:
-        '''
-        S3 handling to download weights and datasets
-        '''
         AWS_ENDPOINT_URL=os.environ.get("AWS_ENDPOINT_URL", "https://ecs.dsta.ai")
         AWS_ACCESS_KEY=os.environ.get("AWS_ACCESS_KEY")
         AWS_SECRET_ACCESS=os.environ.get("AWS_SECRET_ACCESS")
@@ -345,11 +341,17 @@ if __name__ == "__main__":
     extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
     extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
 
+    '''
+    clearml task init
+    '''
     if not args.skip_clearml:
         cl_task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
     else:
         cl_task = None
 
+    '''
+    Launching detectron2 run
+    '''
     launch(
         main,
         args.num_gpus,
@@ -359,8 +361,8 @@ if __name__ == "__main__":
         args=(args, cl_task),
     )
 
+    '''
+    S3 handling to upload outputs
+    '''
     if not args.skip_s3:
-        '''
-        S3 handling to upload outputs
-        '''
         s3_handler.ul_dir(local_output_dir, args.s3_output_bucket, args.s3_output_path, f'{args.clearml_task_name}')
