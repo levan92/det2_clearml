@@ -6,7 +6,6 @@ if __name__ == "__main__":
     import os
     from pathlib import Path
 
-    import wget
     from clearml import Task
 
     from det2_default_argparser import default_argument_parser
@@ -85,11 +84,14 @@ if __name__ == "__main__":
     S3 handling to download weights and datasets
     '''    
     from utils.s3_helper import S3_handler
+    import ssl
+    import wget
 
     if not args.skip_s3:
         CERT_PATH=os.environ.get("CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt")
         CERT_DL_URL='http://gitlab.dsta.ai/ai-platform/getting-started/raw/master/config/ca.dsta.ai.crt'
         if CERT_DL_URL:
+            ssl._create_default_https_context = ssl._create_unverified_context
             wget.download(CERT_DL_URL)
             CERT_PATH = Path(CERT_DL_URL).name
 
