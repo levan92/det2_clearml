@@ -66,6 +66,23 @@ if __name__ == "__main__":
     ## UPLOAD OUTPUT ARGS
     parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
     parser.add_argument("--s3-output-path", help="S3 Path to output")
+    ## Hyperparams
+    parser.add_argument(
+        "--solver-ims-per-batch",
+        help="SOLVER.IMS_PER_BATCH"
+    )
+    parser.add_argument(
+        "--solver-base-lr",
+        help="SOLVER.BASE_LR"
+    )
+    parser.add_argument(
+        "--solver-steps",
+        help="SOLVER.STEPS"
+    )
+    parser.add_argument(
+        "--solver-max-iter",
+        help="SOLVER.MAX_ITER"
+    )
     args = parser.parse_args()
     print("Command Line Args:", args)
 
@@ -135,6 +152,12 @@ if __name__ == "__main__":
     extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
     extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
     extend_opts(args.opts, 'MODEL.WEIGHTS', args.model_weights)
+
+    extend_opts(args.opts, 'SOLVER.IMS_PER_BATCH', args.solver_ims_per_batch)
+    extend_opts(args.opts, 'SOLVER.BASE_LR', args.solver_base_lr)
+    extend_opts(args.opts, 'SOLVER.STEPS', args.solver_steps)
+    extend_opts(args.opts, 'SOLVER.MAX_ITER', args.solver_max_iter)
+
 
     '''
     Launching detectron2 run
