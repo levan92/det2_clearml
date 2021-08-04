@@ -68,12 +68,20 @@ if __name__ == "__main__":
     parser.add_argument("--s3-output-path", help="S3 Path to output")
     ## Hyperparams
     parser.add_argument(
+        "--test-eval-period",
+        help="TEST.EVAL_PERIOD"
+    )
+    parser.add_argument(
         "--solver-ims-per-batch",
         help="SOLVER.IMS_PER_BATCH"
     )
     parser.add_argument(
         "--solver-base-lr",
         help="SOLVER.BASE_LR"
+    )
+    parser.add_argument(
+        "--solver-warmup-iters",
+        help="SOLVER.WARMUP_ITERS"
     )
     parser.add_argument(
         "--solver-steps",
@@ -83,6 +91,11 @@ if __name__ == "__main__":
         "--solver-max-iter",
         help="SOLVER.MAX_ITER"
     )
+    parser.add_argument(
+        "--dataloader-num-workers",
+        help="DATALOADER.NUM_WORKERS"
+    )
+
     args = parser.parse_args()
     print("Command Line Args:", args)
 
@@ -132,32 +145,34 @@ if __name__ == "__main__":
     from utils.det2_helper import register_datasets, parse_datasets_args, extend_opts
 
     # Register the custom datasets that don't conform to dataset format assumptions first
-    already_reged = []
-    if args.custom_dsnames:
-        assert len(args.custom_dsnames)==len(args.custom_cocojsons)
-        assert len(args.custom_dsnames)==len(args.custom_imgroots)
-        for dsname, cjson, imroot in zip(args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots):
-            register_datasets(dsname, json_path=cjson, dataset_image_root=imroot)
-            already_reged.append(dsname)
+    # already_reged = []
+    # if args.custom_dsnames:
+    #     assert len(args.custom_dsnames)==len(args.custom_cocojsons)
+    #     assert len(args.custom_dsnames)==len(args.custom_imgroots)
+    #     for dsname, cjson, imroot in zip(args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots):
+    #         register_datasets(dsname, json_path=cjson, dataset_image_root=imroot)
+    #         already_reged.append(dsname)
         # register_coco_instances("coco_train", {}, '/media/dh/HDD/coco/annotations/instances_train2017.json', '/media/dh/HDD/coco/train2017')
         # register_coco_instances("coco_val", {}, '//media/dh/HDD/coco/smallval/instances_val2017.json', '/media/dh/HDD/coco/smallval/images')
     # Then register remaining of train and test sets, assuming remainders all conform to dataset format.
     datasets_to_reg = []
     datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
     datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
-    remainder_sets = list(set(datasets_to_reg)-set(already_reged))
-    for dataset_to_reg in remainder_sets:
-        register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
+    # remainder_sets = list(set(datasets_to_reg)-set(already_reged))
+    # for dataset_to_reg in remainder_sets:
+    #     register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
 
     extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
     extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
     extend_opts(args.opts, 'MODEL.WEIGHTS', args.model_weights)
 
+    extend_opts(args.opts, 'TEST.EVAL_PERIOD', args.test_eval_period)
     extend_opts(args.opts, 'SOLVER.IMS_PER_BATCH', args.solver_ims_per_batch)
     extend_opts(args.opts, 'SOLVER.BASE_LR', args.solver_base_lr)
+    extend_opts(args.opts, 'SOLVER.WARMUP_ITERS', args.solver_warmup_iters)
     extend_opts(args.opts, 'SOLVER.STEPS', args.solver_steps)
     extend_opts(args.opts, 'SOLVER.MAX_ITER', args.solver_max_iter)
-
+    extend_opts(args.opts, 'DATALOADER.NUM_WORKERS', args.dataloader_num_workers)
 
     '''
     Launching detectron2 run
@@ -172,7 +187,8 @@ if __name__ == "__main__":
         num_machines=args.num_machines,
         machine_rank=args.machine_rank,
         dist_url=args.dist_url,
-        args=(args, cl_task),
+        args=(args,),
+        # args=(args, cl_task),
     )
 
     '''

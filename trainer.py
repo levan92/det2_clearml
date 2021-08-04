@@ -93,7 +93,7 @@ class Trainer(DefaultTrainer):
         # we can use the saved checkpoint to debug.
         ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
 
-        if cfg.SOLVER.BEST_CHECKPOINTER:
+        if cfg.SOLVER.BEST_CHECKPOINTER and comm.is_main_process():
             ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC, mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE, save_first=True))
 
         if comm.is_main_process():
@@ -182,7 +182,8 @@ class Trainer(DefaultTrainer):
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
 
-def setup(args, cl_task=None):
+def setup(args):
+# def setup(args, cl_task=None):
     """
     Create configs and perform basic setups.
     """
@@ -191,17 +192,41 @@ def setup(args, cl_task=None):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
 
-    if cl_task:
-        # cl_task.connect(cfg)
-        cl_dict = cl_task.connect_configuration(name='hyperparams', configuration=cfg)
-        cfg = CfgNode(init_dict=cl_dict)
+    # if cl_task:
+    #     # cl_task.connect(cfg)
+    #     cl_dict = cl_task.connect_configuration(name='hyperparams', configuration=cfg)
+    #     cfg = CfgNode(init_dict=cl_dict)
 
     cfg.freeze()
     default_setup(cfg, args)
     return cfg
 
-def main(args, cl_task=None):
-    cfg = setup(args, cl_task=cl_task)
+# def main(args, cl_task=None):
+#     cfg = setup(args, cl_task=cl_task)
+def main(args):
+
+    '''
+    Datasets Registration
+    '''
+    from utils.det2_helper import register_datasets, parse_datasets_args
+    local_data_dir = 'datasets'
+    # Register the custom datasets that don't conform to dataset format assumptions first
+    already_reged = []
+    if args.custom_dsnames:
+        assert len(args.custom_dsnames)==len(args.custom_cocojsons)
+        assert len(args.custom_dsnames)==len(args.custom_imgroots)
+        for dsname, cjson, imroot in zip(args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots):
+            register_datasets(dsname, json_path=cjson, dataset_image_root=imroot)
+            already_reged.append(dsname)
+    # Then register remaining of train and test sets, assuming remainders all conform to dataset format.
+    datasets_to_reg = []
+    datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
+    datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
+    remainder_sets = list(set(datasets_to_reg)-set(already_reged))
+    for dataset_to_reg in remainder_sets:
+        register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
+
+    cfg = setup(args)
 
     if args.eval_only:
         model = Trainer.build_model(cfg)
