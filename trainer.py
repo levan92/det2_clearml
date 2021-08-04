@@ -7,8 +7,8 @@ from fvcore.nn.precise_bn import get_bn_modules
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg, CfgNode
-from detectron2.data import MetadataCatalog, build_detection_train_loader, build_detection_test_loader
-from detectron2.engine import DefaultTrainer, default_argument_parser, default_setup, hooks, launch
+from detectron2.data import MetadataCatalog, build_detection_test_loader, build_detection_train_loader
+from detectron2.engine import DefaultTrainer, default_setup, hooks
 from detectron2.evaluation import (
     CityscapesInstanceEvaluator,
     CityscapesSemSegEvaluator,
@@ -94,7 +94,7 @@ class Trainer(DefaultTrainer):
         ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
 
         if cfg.SOLVER.BEST_CHECKPOINTER:
-            ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC, mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE))
+            ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC, mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE, save_first=True))
 
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.

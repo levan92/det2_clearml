@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-
-
 if __name__ == "__main__":
     import os
     from pathlib import Path
@@ -12,6 +10,7 @@ if __name__ == "__main__":
 
     parser = default_argument_parser()
     parser.add_argument("--skip-clearml", help='flag to entirely skip any clearml action.', action='store_true')
+    parser.add_argument("--clearml-run-locally", help='flag to run job locally but keep clearml expt tracking.', action='store_true')
     ## CLEARML ARGS
     parser.add_argument("--clearml-proj", default="det2", help="ClearML Project Name")
     parser.add_argument("--clearml-task-name", default="Task", help="ClearML Task Name")
@@ -28,6 +27,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("--s3-models-bucket", help="S3 Bucket for models")
     parser.add_argument("--s3-models-path", help="S3 Models Path")
+    ## Model weights to load for training
+    parser.add_argument(
+        "--model-weights", 
+        help="MODEL.WEIGHTS | Path to pretrained model weights")
     ## DOWNLOAD DATA ARGS
     parser.add_argument(
         "--download-data",
@@ -75,7 +78,8 @@ if __name__ == "__main__":
     if not args.skip_clearml:
         cl_task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
         cl_task.set_base_docker(f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
-        cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
+        if not args.clearml_run_locally:
+            cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
 
     else:
         cl_task = None
@@ -130,6 +134,7 @@ if __name__ == "__main__":
 
     extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
     extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
+    extend_opts(args.opts, 'MODEL.WEIGHTS', args.model_weights)
 
     '''
     Launching detectron2 run
