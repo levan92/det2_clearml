@@ -1,6 +1,7 @@
 '''
 S3 downloading and uploading
 '''
+import os
 from pathlib import Path
 import wget
 import tarfile
