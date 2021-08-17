@@ -111,9 +111,9 @@ if __name__ == "__main__":
         cl_task.set_base_docker(f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
         if not args.clearml_run_locally:
             cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
-
+        cl_task_id = cl_task.task_id
     else:
-        cl_task = None
+        cl_task_id = None
 
     '''
     S3 handling to download weights and datasets
@@ -192,8 +192,7 @@ if __name__ == "__main__":
         num_machines=args.num_machines,
         machine_rank=args.machine_rank,
         dist_url=args.dist_url,
-        args=(args,),
-        # args=(args, cl_task),
+        args=(args, cl_task_id),
     )
 
     '''

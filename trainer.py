@@ -22,6 +22,8 @@ from detectron2.evaluation import (
 )
 from detectron2.modeling import GeneralizedRCNNWithTTA
 
+from clearml import Task
+
 from data import AugDatasetMapper
 from models import resnet_IN_fpn
 from config import add_custom_configs
@@ -183,8 +185,7 @@ class Trainer(DefaultTrainer):
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
 
-def setup(args):
-# def setup(args, cl_task=None):
+def setup(args, cl_task=None):
     """
     Create configs and perform basic setups.
     """
@@ -193,19 +194,19 @@ def setup(args):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
 
-    # if cl_task:
-    #     # cl_task.connect(cfg)
-    #     cl_dict = cl_task.connect_configuration(name='hyperparams', configuration=cfg)
-    #     cfg = CfgNode(init_dict=cl_dict)
+    if cl_task:
+        cl_dict = cl_task.connect_configuration(name='hyperparams', configuration=cfg)
+        cfg = CfgNode(init_dict=cl_dict)
 
     cfg.freeze()
     default_setup(cfg, args)
     return cfg
 
-# def main(args, cl_task=None):
-#     cfg = setup(args, cl_task=cl_task)
-def main(args):
-
+def main(args, cl_task_id=None):
+    if cl_task_id is not None:
+        cl_task = Task.get_task(task_id=cl_task_id)
+    else:
+        cl_task = None
     '''
     Datasets Registration
     '''
@@ -227,7 +228,7 @@ def main(args):
     for dataset_to_reg in remainder_sets:
         register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
 
-    cfg = setup(args)
+    cfg = setup(args, cl_task)
 
     if args.eval_only:
         model = Trainer.build_model(cfg)
