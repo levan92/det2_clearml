@@ -10,6 +10,7 @@ if __name__ == "__main__":
 
     parser = default_argument_parser()
     parser.add_argument("--skip-clearml", help='flag to entirely skip any clearml action.', action='store_true')
+    parser.add_argument("--monitor-ps", help='flag to monitoring processes.', action='store_true')
     parser.add_argument("--clearml-run-locally", help='flag to run job locally but keep clearml expt tracking.', action='store_true')
     ## CLEARML ARGS
     parser.add_argument("--clearml-proj", default="det2", help="ClearML Project Name")
@@ -180,6 +181,10 @@ if __name__ == "__main__":
     from detectron2.engine import launch
 
     from trainer import main
+
+    if args.monitor_ps:
+        from utils.psutil_helper import start_monitor
+        start_monitor(freq=1)
 
     launch(
         main,
