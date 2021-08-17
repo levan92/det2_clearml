@@ -9,6 +9,9 @@ def monitor(freq=1):
         print(psutil.virtual_memory())
 
 def start_monitor(freq=1):
-    mp.set_start_method('spawn')
+    try:
+        mp.set_start_method('spawn')
+    except RuntimeError:
+        pass
     p = mp.Process(target=monitor, daemon=True, args=(freq,))
     p.start()
