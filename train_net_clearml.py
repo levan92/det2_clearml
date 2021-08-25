@@ -32,6 +32,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model-weights", 
         help="MODEL.WEIGHTS | Path to pretrained model weights")
+    parser.add_argument(
+        "--from-scratch",
+        help="MODEL.WEIGHTS set to empty string | Train model from scratch",
+        action='store_true'
+    )
     ## DOWNLOAD DATA ARGS
     parser.add_argument(
         "--download-data",
@@ -165,7 +170,10 @@ if __name__ == "__main__":
 
     extend_opts(args.opts, 'DATASETS.TRAIN', datasets_train)
     extend_opts(args.opts, 'DATASETS.TEST', datasets_test)
-    extend_opts(args.opts, 'MODEL.WEIGHTS', args.model_weights)
+    if args.from_scratch:
+        extend_opts(args.opts, 'MODEL.WEIGHTS', "")
+    else:
+        extend_opts(args.opts, 'MODEL.WEIGHTS', args.model_weights)
 
     extend_opts(args.opts, 'TEST.EVAL_PERIOD', args.test_eval_period)
     extend_opts(args.opts, 'SOLVER.IMS_PER_BATCH', args.solver_ims_per_batch)
