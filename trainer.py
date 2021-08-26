@@ -93,8 +93,7 @@ class Trainer(DefaultTrainer):
 
         # Do evaluation after checkpointer, because then if it fails,
         # we can use the saved checkpoint to debug.
-        if comm.is_main_process():
-            ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
+        ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
 
         if cfg.SOLVER.BEST_CHECKPOINTER and comm.is_main_process():
             ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC, mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE, save_first=True))
