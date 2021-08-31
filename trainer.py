@@ -203,7 +203,8 @@ def setup(args, cl_task=None):
 
 def main(args, cl_task_id=None):
     if cl_task_id is not None:
-        cl_task = Task.get_task(task_id=cl_task_id)
+        cl_task = Task.current_task()
+        assert cl_task.task_id == cl_task_id,'Current task in process does not match given task id!'
     else:
         cl_task = None
     '''
