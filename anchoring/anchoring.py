@@ -9,7 +9,7 @@ from scipy.stats import describe
 from sklearn.cluster import KMeans 
 from tqdm import tqdm 
 
-def get_imgs_info_from_coco(coco_dict):
+def get_imgs_info_from_coco(coco_dict, give_stats=False):
     ih_list = []
     iw_list = []
     imgsize_dict = {}
@@ -18,18 +18,19 @@ def get_imgs_info_from_coco(coco_dict):
         ih_list.append(ih)
         iw_list.append(iw)
         imgsize_dict[img_dict['id']] = iw, ih
-    print('Images height stats')
-    describe_stats(ih_list)
-    print('Images width stats')
-    describe_stats(iw_list)
+    if give_stats:
+        print('Images height stats')
+        describe_stats(ih_list)
+        print('Images width stats')
+        describe_stats(iw_list)
     return imgsize_dict
 
-def get_info_from_coco(coco_dict, include_crowdedness=False, imgsize_dict=None, target_size=None):
+def get_info_from_coco(coco_dict, include_crowdedness=False, imgsize_dict=None, target_size=None, give_stats=False):
     # if include_crowdedness, you need to make sure no overlapping image_ids if 'images' are merged
     # imgsize_dict and target_size should both be given together, or neither given. 
     if include_crowdedness:
         counts = defaultdict(int)
-    if imgsize_dict is not None:
+    if target_size is not None:
         assert target_size and target_size > 0
     sizes = []
     ars = []
@@ -48,7 +49,7 @@ def get_info_from_coco(coco_dict, include_crowdedness=False, imgsize_dict=None, 
         size = ( w * h ) ** 0.5
         sizes.append(size)
 
-        if imgsize_dict is not None:
+        if target_size is not None:
             iw, ih = imgsize_dict[annot['image_id']]
             imsize = ( iw * ih ) ** 0.5
             normalised_size = size / imsize * target_size
@@ -60,10 +61,15 @@ def get_info_from_coco(coco_dict, include_crowdedness=False, imgsize_dict=None, 
     else:
         res.append(None)
         
-    if imgsize_dict is not None:
+    if target_size is not None:
         res.append(norm_sizes)
     else:
         res.append(None)
+    if give_stats:
+        print('Aspect Ratio stats')
+        describe_stats(ars)
+        print('BB Size stats')
+        describe_stats(sizes)
     return res
 
 def get_clusters(juice_list, k=3):
@@ -81,12 +87,12 @@ def describe_stats(juice_list):
     print(f'minmax {descrip.minmax}, mean {descrip.mean}, median {median_val}, sd {sd}')
     return descrip.minmax, descrip.mean, median_val, sd
 
-def process(coco_dict, include_crowdedness, target_size=None):
-    if target_size:
-        imgsize_dict = get_imgs_info_from_coco(coco_dict)
+def process(coco_dict, include_crowdedness, target_size=None, give_stats=False):
+    if target_size or give_stats:
+        imgsize_dict = get_imgs_info_from_coco(coco_dict, give_stats=give_stats)
     else:
         imgsize_dict = None
-    ars, sizes, crowdedness, norm_sizes = get_info_from_coco(coco_dict, include_crowdedness=include_crowdedness, imgsize_dict=imgsize_dict, target_size=target_size)
+    ars, sizes, crowdedness, norm_sizes = get_info_from_coco(coco_dict, include_crowdedness=include_crowdedness, imgsize_dict=imgsize_dict, target_size=target_size, give_stats=give_stats)
     ars_clusters = get_clusters(ars)    
     print('Aspect Ratios')
     print('[[{:.1f}, {:.1f}, {:.1f}]]'.format(*ars_clusters))
@@ -118,7 +124,8 @@ if __name__ == '__main__':
     ap.add_argument('cocojsons', nargs='+', help='List paths to json (coco format) files')
     ap.add_argument('--crowd', action='store_true', help='whether to calculate crowdedness stats (defaults to false)')
     ap.add_argument('--target-size',help='target size to normalise bb sizes to.', type=float)
+    ap.add_argument('--stats',help='flag to print stats of bbs and imgs',action='store_true')
     args = ap.parse_args()
 
     coco_dicts = load_coco_jsons(args.cocojsons)
-    process(coco_dicts, include_crowdedness=args.crowd, target_size=args.target_size)
+    process(coco_dicts, include_crowdedness=args.crowd, target_size=args.target_size, give_stats=args.stats)
