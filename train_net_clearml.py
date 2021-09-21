@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--clearml-proj", default="det2", help="ClearML Project Name")
     parser.add_argument("--clearml-task-name", default="Task", help="ClearML Task Name")
     parser.add_argument("--clearml-task-type", default="data_processing", help="ClearML Task Type, e.g. training, testing, inference, etc", choices=['training','testing','inference','data_processing','application','monitor','controller','optimizer','service','qc','custom'])
+    parser.add_argument("--clearml-output-uri", default="s3://ecs.dsta.ai/clearml-models/coco", help="ClearML output uri")
     parser.add_argument("--docker-img", default="harbor.dsta.ai/nvidia/pytorch:21.03-py3", help="Base docker image to pull")
     parser.add_argument("--queue", default="1gpu", help="ClearML Queue")
     ### S3
@@ -112,7 +113,7 @@ if __name__ == "__main__":
     clearml task init
     '''
     if not args.skip_clearml:
-        cl_task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type)
+        cl_task = Task.init(project_name=args.clearml_proj,task_name=args.clearml_task_name, task_type=args.clearml_task_type, output_uri=args.clearml_output_uri)
         cl_task.set_base_docker(f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}")
         if not args.clearml_run_locally:
             cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
