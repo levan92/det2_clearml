@@ -71,8 +71,8 @@ if __name__ == "__main__":
         help="DATASETS.TEST"
     )
     ## UPLOAD OUTPUT ARGS
-    parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
-    parser.add_argument("--s3-output-path", help="S3 Path to output")
+    # parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
+    # parser.add_argument("--s3-output-path", help="S3 Path to output")
     ## Hyperparams
     parser.add_argument(
         "--test-eval-period",
@@ -204,8 +204,8 @@ if __name__ == "__main__":
         args=(args, cl_task_id),
     )
 
-    '''
-    S3 handling to upload outputs
-    '''
-    if not args.skip_s3:
-        s3_handler.ul_dir(local_output_dir, args.s3_output_bucket, args.s3_output_path, f'{cl_task_id}')
+    # '''
+    # S3 handling to upload outputs
+    # '''
+    # if not args.skip_s3:
+    #     s3_handler.ul_dir(local_output_dir, args.s3_output_bucket, args.s3_output_path, f'{cl_task_id}')
