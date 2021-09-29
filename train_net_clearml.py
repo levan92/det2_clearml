@@ -75,6 +75,10 @@ if __name__ == "__main__":
     # parser.add_argument("--s3-output-path", help="S3 Path to output")
     ## Hyperparams
     parser.add_argument(
+        "--num-classes",
+        help="MODEL.ROI_HEADS.NUM_CLASSES"
+    )
+    parser.add_argument(
         "--test-eval-period",
         help="TEST.EVAL_PERIOD"
     )
@@ -176,6 +180,7 @@ if __name__ == "__main__":
     else:
         extend_opts(args.opts, 'MODEL.WEIGHTS', args.model_weights)
 
+    extend_opts(args.opts, 'MODEL.ROI_HEADS.NUM_CLASSES', args.num_classes)
     extend_opts(args.opts, 'TEST.EVAL_PERIOD', args.test_eval_period)
     extend_opts(args.opts, 'SOLVER.IMS_PER_BATCH', args.solver_ims_per_batch)
     extend_opts(args.opts, 'SOLVER.BASE_LR', args.solver_base_lr)
