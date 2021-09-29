@@ -246,6 +246,7 @@ class DeformBottleneckBlock(ResNetBlockBase):
         dilation=1,
         deform_modulated=False,
         deform_num_groups=1,
+        instance_norm=False,
     ):
         super().__init__(in_channels, out_channels, stride)
         self.deform_modulated = deform_modulated
@@ -317,6 +318,11 @@ class DeformBottleneckBlock(ResNetBlockBase):
         nn.init.constant_(self.conv2_offset.weight, 0)
         nn.init.constant_(self.conv2_offset.bias, 0)
 
+        if instance_norm:
+            self.instance_norm = nn.InstanceNorm2d(out_channels, affine=True)
+        else:
+            self.instance_norm = None
+
     def forward(self, x):
         out = self.conv1(x)
         out = F.relu_(out)
@@ -340,6 +346,10 @@ class DeformBottleneckBlock(ResNetBlockBase):
             shortcut = x
 
         out += shortcut
+
+        if self.instance_norm is not None:
+            out = self.instance_norm(out)
+
         out = F.relu_(out)
         return out
 
