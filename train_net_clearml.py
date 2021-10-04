@@ -70,7 +70,7 @@ if __name__ == "__main__":
         "--datasets-test",
         help="DATASETS.TEST"
     )
-    ## UPLOAD OUTPUT ARGS
+    # ## UPLOAD OUTPUT ARGS
     # parser.add_argument("--s3-output-bucket", help="S3 Bucket for output")
     # parser.add_argument("--s3-output-path", help="S3 Path to output")
     ## Hyperparams
