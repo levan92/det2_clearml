@@ -91,6 +91,10 @@ if __name__ == "__main__":
         help="SOLVER.BASE_LR"
     )
     parser.add_argument(
+        "--solver-gamma",
+        help="SOLVER.GAMMA"
+    )
+    parser.add_argument(
         "--solver-warmup-iters",
         help="SOLVER.WARMUP_ITERS"
     )
@@ -184,6 +188,7 @@ if __name__ == "__main__":
     extend_opts(args.opts, 'TEST.EVAL_PERIOD', args.test_eval_period)
     extend_opts(args.opts, 'SOLVER.IMS_PER_BATCH', args.solver_ims_per_batch)
     extend_opts(args.opts, 'SOLVER.BASE_LR', args.solver_base_lr)
+    extend_opts(args.opts, 'SOLVER.GAMMA', args.solver_gamma)
     extend_opts(args.opts, 'SOLVER.WARMUP_ITERS', args.solver_warmup_iters)
     extend_opts(args.opts, 'SOLVER.STEPS', args.solver_steps)
     extend_opts(args.opts, 'SOLVER.MAX_ITER', args.solver_max_iter)
