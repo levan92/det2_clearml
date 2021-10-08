@@ -110,6 +110,14 @@ if __name__ == "__main__":
         "--dataloader-num-workers",
         help="DATALOADER.NUM_WORKERS"
     )
+    parser.add_argument(
+        "--model-anchor-sizes",
+        help="MODEL.ANCHOR_GENERATOR.SIZES"
+    )
+    parser.add_argument(
+        "--model-anchor-ar",
+        help="MODEL.ANCHOR_GENERATOR.ASPECT_RATIOS"
+    )
 
     args = parser.parse_args()
     print("Command Line Args:", args)
@@ -193,6 +201,8 @@ if __name__ == "__main__":
     extend_opts(args.opts, 'SOLVER.STEPS', args.solver_steps)
     extend_opts(args.opts, 'SOLVER.MAX_ITER', args.solver_max_iter)
     extend_opts(args.opts, 'DATALOADER.NUM_WORKERS', args.dataloader_num_workers)
+    extend_opts(args.opts, 'MODEL.ANCHOR_GENERATOR.SIZES', args.model_anchor_sizes)
+    extend_opts(args.opts, 'MODEL.ANCHOR_GENERATOR.ASPECT_RATIOS', args.model_anchor_ar)
 
     '''
     Launching detectron2 run
