@@ -135,6 +135,7 @@ if __name__ == "__main__":
             cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
         cl_task_id = cl_task.task_id
     else:
+        cl_task = None
         cl_task_id = None
 
     '''
@@ -224,8 +225,8 @@ if __name__ == "__main__":
         args=(args, cl_task_id),
     )
 
-    # '''
-    # S3 handling to upload outputs
-    # '''
-    # if not args.skip_s3:
-    #     s3_handler.ul_dir(local_output_dir, args.s3_output_bucket, args.s3_output_path, f'{cl_task_id}')
+    '''
+    S3 handling to upload outputs
+    '''
+    if args.eval_only and cl_task:
+        cl_task.upload_artifact(name='predictions', artifact_object='./output/inference/coco_instances_results.json')
