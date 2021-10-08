@@ -3,6 +3,7 @@
 
 from detectron2.config import CfgNode as CN
 
+
 def add_custom_configs(cfg: CN):
     """
     Add config for densepose head.

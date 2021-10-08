@@ -7,7 +7,7 @@ from trainer import Trainer
 from trainer import setup
 
 ap = argparse.ArgumentParser()
-ap.add_argument('config_file')
+ap.add_argument("config_file")
 args = ap.parse_args()
 
 
@@ -17,7 +17,7 @@ cfg = setup(args, freeze=False)
 
 # cfg.MODEL.WEIGHTS='weights/coco_personkp/model_final_a6e10b.pkl'
 # cfg.MODEL.WEIGHTS = 'weights/coco_personkp/model_final_a6e10b_anchor-removed.pkl'
-cfg.MODEL.WEIGHTS = 'weights/mask_deform/model_final_821d0b.pkl'
+cfg.MODEL.WEIGHTS = "weights/mask_deform/model_final_821d0b.pkl"
 cfg.MODEL.LOAD_PROPOSALS = False
 cfg.DATASETS.TRAIN = ()
 cfg.freeze()
@@ -28,5 +28,6 @@ DetectionCheckpointer(model).resume_or_load(cfg.MODEL.WEIGHTS)
 
 pthfile = cfg.MODEL.WEIGHTS
 import pickle
+
 with open(pthfile, "rb") as f:
     data = pickle.load(f, encoding="latin1")

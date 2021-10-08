@@ -7,7 +7,11 @@ from fvcore.nn.precise_bn import get_bn_modules
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg, CfgNode
-from detectron2.data import MetadataCatalog, build_detection_test_loader, build_detection_train_loader
+from detectron2.data import (
+    MetadataCatalog,
+    build_detection_test_loader,
+    build_detection_train_loader,
+)
 from detectron2.engine import DefaultTrainer, default_setup, hooks
 from detectron2.evaluation import (
     CityscapesInstanceEvaluator,
@@ -28,6 +32,7 @@ from data import AugDatasetMapper
 from models import resnet_IN_fpn
 from config import add_custom_configs
 
+
 def add_custom_configs(cfg: CfgNode):
     _C = cfg
 
@@ -37,13 +42,14 @@ def add_custom_configs(cfg: CfgNode):
     _C.INPUT.LARGE_SCALE_JITTER.ENABLED = True
     _C.INPUT.LARGE_SCALE_JITTER.MIN_SCALE = 0.2
     _C.INPUT.LARGE_SCALE_JITTER.MAX_SCALE = 2.0
-    
-    _C.SOLVER.PERIODIC_CHECKPOINTER = CfgNode({"ENABLED": True})   
+
+    _C.SOLVER.PERIODIC_CHECKPOINTER = CfgNode({"ENABLED": True})
     _C.SOLVER.PERIODIC_CHECKPOINTER.PERIOD = _C.SOLVER.CHECKPOINT_PERIOD
 
     _C.SOLVER.BEST_CHECKPOINTER = CfgNode({"ENABLED": False})
     _C.SOLVER.BEST_CHECKPOINTER.METRIC = "bbox/AP50"
     _C.SOLVER.BEST_CHECKPOINTER.MODE = "max"
+
 
 class Trainer(DefaultTrainer):
     """
@@ -85,7 +91,11 @@ class Trainer(DefaultTrainer):
         # This is not always the best: if checkpointing has a different frequency,
         # some checkpoints may have more precise statistics than others.
         if cfg.SOLVER.PERIODIC_CHECKPOINTER.ENABLED and comm.is_main_process():
-            ret.append(hooks.PeriodicCheckpointer(self.checkpointer, cfg.SOLVER.PERIODIC_CHECKPOINTER.PERIOD))
+            ret.append(
+                hooks.PeriodicCheckpointer(
+                    self.checkpointer, cfg.SOLVER.PERIODIC_CHECKPOINTER.PERIOD
+                )
+            )
 
         def test_and_save_results():
             self._last_eval_results = self.test(self.cfg, self.model)
@@ -96,7 +106,15 @@ class Trainer(DefaultTrainer):
         ret.append(hooks.EvalHook(cfg.TEST.EVAL_PERIOD, test_and_save_results))
 
         if cfg.SOLVER.BEST_CHECKPOINTER and comm.is_main_process():
-            ret.append(hooks.BestCheckpointer(cfg.TEST.EVAL_PERIOD, self.checkpointer, cfg.SOLVER.BEST_CHECKPOINTER.METRIC, mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE, save_first=True))
+            ret.append(
+                hooks.BestCheckpointer(
+                    cfg.TEST.EVAL_PERIOD,
+                    self.checkpointer,
+                    cfg.SOLVER.BEST_CHECKPOINTER.METRIC,
+                    mode=cfg.SOLVER.BEST_CHECKPOINTER.MODE,
+                    save_first=True,
+                )
+            )
 
         if comm.is_main_process():
             # Here the default print/log frequency of each writer is used.
@@ -106,7 +124,9 @@ class Trainer(DefaultTrainer):
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):
-        return build_detection_test_loader(cfg, dataset_name, mapper=AugDatasetMapper(cfg, False))
+        return build_detection_test_loader(
+            cfg, dataset_name, mapper=AugDatasetMapper(cfg, False)
+        )
 
     @classmethod
     def build_train_loader(cls, cfg):
@@ -118,7 +138,7 @@ class Trainer(DefaultTrainer):
         Overwrite it if you'd like a different data loader.
         """
         return build_detection_train_loader(cfg, mapper=AugDatasetMapper(cfg, True))
-    
+
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
         """
@@ -184,6 +204,7 @@ class Trainer(DefaultTrainer):
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
 
+
 def setup(args, cl_task=None):
     """
     Create configs and perform basic setups.
@@ -194,37 +215,43 @@ def setup(args, cl_task=None):
     cfg.merge_from_list(args.opts)
 
     if cl_task:
-        cl_dict = cl_task.connect_configuration(name='hyperparams', configuration=cfg)
+        cl_dict = cl_task.connect_configuration(name="hyperparams", configuration=cfg)
         cfg = CfgNode(init_dict=cl_dict)
 
     cfg.freeze()
     default_setup(cfg, args)
     return cfg
 
+
 def main(args, cl_task_id=None):
     if cl_task_id is not None:
         cl_task = Task.current_task()
-        assert cl_task.task_id == cl_task_id,'Current task in process does not match given task id!'
+        assert (
+            cl_task.task_id == cl_task_id
+        ), "Current task in process does not match given task id!"
     else:
         cl_task = None
-    '''
+    """
     Datasets Registration
-    '''
+    """
     from utils.det2_helper import register_datasets, parse_datasets_args
-    local_data_dir = 'datasets'
+
+    local_data_dir = "datasets"
     # Register the custom datasets that don't conform to dataset format assumptions first
     already_reged = []
     if args.custom_dsnames:
-        assert len(args.custom_dsnames)==len(args.custom_cocojsons)
-        assert len(args.custom_dsnames)==len(args.custom_imgroots)
-        for dsname, cjson, imroot in zip(args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots):
+        assert len(args.custom_dsnames) == len(args.custom_cocojsons)
+        assert len(args.custom_dsnames) == len(args.custom_imgroots)
+        for dsname, cjson, imroot in zip(
+            args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots
+        ):
             register_datasets(dsname, json_path=cjson, dataset_image_root=imroot)
             already_reged.append(dsname)
     # Then register remaining of train and test sets, assuming remainders all conform to dataset format.
     datasets_to_reg = []
     datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
     datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
-    remainder_sets = list(set(datasets_to_reg)-set(already_reged))
+    remainder_sets = list(set(datasets_to_reg) - set(already_reged))
     for dataset_to_reg in remainder_sets:
         register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
 

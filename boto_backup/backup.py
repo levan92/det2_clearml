@@ -62,6 +62,6 @@ else:
     dst_buck = src_buck
 
 dest_path = Path(args.dst_path) / parent_name / file_name
-print(f'Source: {source}')
-print(f'Destination path: {dest_path}')
+print(f"Source: {source}")
+print(f"Destination path: {dest_path}")
 dst_buck.copy(source, str(dest_path))

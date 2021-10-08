@@ -11,6 +11,7 @@ from detectron2.data import detection_utils as utils
 
 from .new_augs import LargeScaleJitter
 
+
 def build_transform_gen(cfg, is_train):
     """
     Create a list of :class:`TransformGen` from config.
@@ -28,41 +29,44 @@ def build_transform_gen(cfg, is_train):
         max_size = cfg.INPUT.MAX_SIZE_TEST
         sample_style = "choice"
     if sample_style == "range":
-        assert len(min_size) == 2, "more than 2 ({}) min_size(s) are provided for ranges".format(
-            len(min_size)
-        )
+        assert (
+            len(min_size) == 2
+        ), "more than 2 ({}) min_size(s) are provided for ranges".format(len(min_size))
 
     logger = logging.getLogger(__name__)
     tfm_gens = []
-    
+
     if is_train:
         tfm_gens.append(T.RandomFlip(prob=0.5, horizontal=True))
 
     if is_train and cfg.INPUT.LARGE_SCALE_JITTER.ENABLED:
-        tfm_gens.append(                
+        tfm_gens.append(
             LargeScaleJitter(
-                    min_scale = cfg.INPUT.LARGE_SCALE_JITTER.MIN_SCALE,
-                    max_scale = cfg.INPUT.LARGE_SCALE_JITTER.MAX_SCALE,
-                    short_edge_length = min_size, 
-                    max_size = max_size, 
-                    sample_style= sample_style, 
-                    interp = Image.BILINEAR,
-                    pad_value = 128.0
-                )
+                min_scale=cfg.INPUT.LARGE_SCALE_JITTER.MIN_SCALE,
+                max_scale=cfg.INPUT.LARGE_SCALE_JITTER.MAX_SCALE,
+                short_edge_length=min_size,
+                max_size=max_size,
+                sample_style=sample_style,
+                interp=Image.BILINEAR,
+                pad_value=128.0,
             )
+        )
     else:
-       tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
+        tfm_gens.append(T.ResizeShortestEdge(min_size, max_size, sample_style))
 
     if is_train:
-        tfm_gens.extend([     
-            T.RandomBrightness(0.5, 1.5),
-            T.RandomContrast(0.5, 1.5),
-            T.RandomSaturation(0.5, 1.2),
-            T.RandomLighting(1.0),
-                        ])
+        tfm_gens.extend(
+            [
+                T.RandomBrightness(0.5, 1.5),
+                T.RandomContrast(0.5, 1.5),
+                T.RandomSaturation(0.5, 1.2),
+                T.RandomLighting(1.0),
+            ]
+        )
         logger.info("TransformGens used in training: " + str(tfm_gens))
         print("TransformGens used in training: " + str(tfm_gens))
     return tfm_gens
+
 
 class AugDatasetMapper:
     """
@@ -84,7 +88,9 @@ class AugDatasetMapper:
     def __init__(self, cfg, is_train=True):
         if cfg.INPUT.CROP.ENABLED and is_train:
             self.crop_gen = T.RandomCrop(cfg.INPUT.CROP.TYPE, cfg.INPUT.CROP.SIZE)
-            logging.getLogger(__name__).info("CropGen used in training: " + str(self.crop_gen))
+            logging.getLogger(__name__).info(
+                "CropGen used in training: " + str(self.crop_gen)
+            )
             print("CropGen used in training: " + str(self.crop_gen))
         else:
             self.crop_gen = None
@@ -100,7 +106,9 @@ class AugDatasetMapper:
         # fmt: on
         if self.keypoint_on and is_train:
             # Flip only makes sense in training
-            self.keypoint_hflip_indices = utils.create_keypoint_hflip_indices(cfg.DATASETS.TRAIN)
+            self.keypoint_hflip_indices = utils.create_keypoint_hflip_indices(
+                cfg.DATASETS.TRAIN
+            )
         else:
             self.keypoint_hflip_indices = None
 
@@ -126,7 +134,7 @@ class AugDatasetMapper:
         image = utils.read_image(dataset_dict["file_name"], format=self.img_format)
         utils.check_image_size(dataset_dict, image)
 
-        if "annotations" not in dataset_dict or len(dataset_dict['annotations'])==0 :
+        if "annotations" not in dataset_dict or len(dataset_dict["annotations"]) == 0:
             image, transforms = T.apply_transform_gens(
                 ([self.crop_gen] if self.crop_gen else []) + self.tfm_gens, image
             )
@@ -149,12 +157,18 @@ class AugDatasetMapper:
         # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory,
         # but not efficient on large generic data structures due to the use of pickle & mp.Queue.
         # Therefore it's important to use torch.Tensor.
-        dataset_dict["image"] = torch.as_tensor(np.ascontiguousarray(image.transpose(2, 0, 1)))
+        dataset_dict["image"] = torch.as_tensor(
+            np.ascontiguousarray(image.transpose(2, 0, 1))
+        )
 
         # USER: Remove if you don't use pre-computed proposals.
         if self.load_proposals:
             utils.transform_proposals(
-                dataset_dict, image_shape, transforms, self.min_box_side_len, self.proposal_topk
+                dataset_dict,
+                image_shape,
+                transforms,
+                self.min_box_side_len,
+                self.proposal_topk,
             )
 
         if not self.is_train:
@@ -174,7 +188,10 @@ class AugDatasetMapper:
             # USER: Implement additional transformations if you have other types of data
             annos = [
                 utils.transform_instance_annotations(
-                    obj, transforms, image_shape, keypoint_hflip_indices=self.keypoint_hflip_indices
+                    obj,
+                    transforms,
+                    image_shape,
+                    keypoint_hflip_indices=self.keypoint_hflip_indices,
                 )
                 for obj in dataset_dict.pop("annotations")
                 if obj.get("iscrowd", 0) == 0

@@ -3,24 +3,30 @@ import sys
 import numpy as np
 from PIL import Image
 from fvcore.transforms.transform import NoOpTransform, TransformList
-from detectron2.data.transforms import Augmentation, ResizeTransform, CropTransform, PadTransform
+from detectron2.data.transforms import (
+    Augmentation,
+    ResizeTransform,
+    CropTransform,
+    PadTransform,
+)
+
 
 class LargeScaleJitter(Augmentation):
-    '''
+    """
     Re-implemented the scaling portion from Large Scale Jitter augmentations in https://github.com/facebookresearch/detectron2/blob/master/configs/new_baselines/mask_rcnn_R_50_FPN_100ep_LSJ.py
 
-    This new LSJ merges logic from ResizeShortestEdge,  ResizeScale and FixedSizeCrop such that it calculates random target width and height based on given shortest and max edge length and thereafter does the random scaling, followed by cropping to target size.  
-    '''
+    This new LSJ merges logic from ResizeShortestEdge,  ResizeScale and FixedSizeCrop such that it calculates random target width and height based on given shortest and max edge length and thereafter does the random scaling, followed by cropping to target size.
+    """
 
     def __init__(
-        self, 
+        self,
         min_scale: float,
         max_scale: float,
-        short_edge_length, 
-        max_size=sys.maxsize, 
-        sample_style="range", 
+        short_edge_length,
+        max_size=sys.maxsize,
+        sample_style="range",
         interp=Image.BILINEAR,
-        pad_value: float = 128.0
+        pad_value: float = 128.0,
     ):
         """
         Args:
@@ -52,7 +58,9 @@ class LargeScaleJitter(Augmentation):
 
         ## ResizeShortestEdge logic to get target width and height
         if self.is_range:
-            size = np.random.randint(self.short_edge_length[0], self.short_edge_length[1] + 1)
+            size = np.random.randint(
+                self.short_edge_length[0], self.short_edge_length[1] + 1
+            )
         else:
             size = np.random.choice(self.short_edge_length)
         if size == 0:
@@ -75,12 +83,9 @@ class LargeScaleJitter(Augmentation):
         # Compute the image scale and scaled size.
         random_scale = np.random.uniform(self.min_scale, self.max_scale)
         random_scale_size = np.multiply(output_size, random_scale)
-        scale = np.minimum(
-            random_scale_size[0] / h, 
-            random_scale_size[1] / w
-        )
+        scale = np.minimum(random_scale_size[0] / h, random_scale_size[1] / w)
         scaled_size = np.round(np.multiply(input_size, scale)).astype(int)
-        
+
         resize_transform = ResizeTransform(
             h, w, scaled_size[0], scaled_size[1], self.interp
         )
@@ -92,7 +97,12 @@ class LargeScaleJitter(Augmentation):
         offset = np.multiply(max_offset, np.random.uniform(0.0, 1.0))
         offset = np.round(offset).astype(int)
         crop_transform = CropTransform(
-            offset[1], offset[0], output_size[1], output_size[0], scaled_size[1], scaled_size[0]
+            offset[1],
+            offset[0],
+            output_size[1],
+            output_size[0],
+            scaled_size[1],
+            scaled_size[0],
         )
 
         # Add padding if the image is scaled down.
@@ -100,7 +110,13 @@ class LargeScaleJitter(Augmentation):
         pad_size = np.maximum(pad_size, 0)
         original_size = np.minimum(scaled_size, output_size)
         pad_transform = PadTransform(
-            0, 0, pad_size[1], pad_size[0], original_size[1], original_size[0], self.pad_value
+            0,
+            0,
+            pad_size[1],
+            pad_size[0],
+            original_size[1],
+            original_size[0],
+            self.pad_value,
         )
 
         return TransformList([resize_transform, crop_transform, pad_transform])

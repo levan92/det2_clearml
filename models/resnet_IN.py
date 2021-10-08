@@ -228,6 +228,7 @@ class BottleneckBlock(CNNBlockBase):
         out = F.relu_(out)
         return out
 
+
 class DeformBottleneckBlock(ResNetBlockBase):
     """
     Similar to :class:`BottleneckBlock`, but with deformable conv in the 3x3 convolution.
@@ -354,7 +355,16 @@ class DeformBottleneckBlock(ResNetBlockBase):
         return out
 
 
-def make_stage(block_class, num_blocks, first_stride, *, in_channels, out_channels, instance_norm, **kwargs):
+def make_stage(
+    block_class,
+    num_blocks,
+    first_stride,
+    *,
+    in_channels,
+    out_channels,
+    instance_norm,
+    **kwargs,
+):
     """
     Create a list of blocks just like those in a ResNet stage.
 
@@ -378,7 +388,7 @@ def make_stage(block_class, num_blocks, first_stride, *, in_channels, out_channe
                 in_channels=in_channels,
                 out_channels=out_channels,
                 stride=first_stride if i == 0 else 1,
-                instance_norm=instance_norm if i == (num_blocks-1) else False,
+                instance_norm=instance_norm if i == (num_blocks - 1) else False,
                 **kwargs,
             )
         )
@@ -471,7 +481,9 @@ class ResNet(Backbone):
         assert len(self._out_features)
         children = [x[0] for x in self.named_children()]
         for out_feature in self._out_features:
-            assert out_feature in children, "Available children: {}".format(", ".join(children))
+            assert out_feature in children, "Available children: {}".format(
+                ", ".join(children)
+            )
 
     def forward(self, x):
         outputs = {}
@@ -493,7 +505,8 @@ class ResNet(Backbone):
     def output_shape(self):
         return {
             name: ShapeSpec(
-                channels=self._out_feature_channels[name], stride=self._out_feature_strides[name]
+                channels=self._out_feature_channels[name],
+                stride=self._out_feature_strides[name],
             )
             for name in self._out_features
         }
@@ -564,23 +577,29 @@ def build_resnet_IN_backbone(cfg, input_shape):
     }[depth]
 
     if depth in [18, 34]:
-        assert out_channels == 64, "Must set MODEL.RESNETS.RES2_OUT_CHANNELS = 64 for R18/R34"
+        assert (
+            out_channels == 64
+        ), "Must set MODEL.RESNETS.RES2_OUT_CHANNELS = 64 for R18/R34"
         assert not any(
             deform_on_per_stage
         ), "MODEL.RESNETS.DEFORM_ON_PER_STAGE unsupported for R18/R34"
-        assert res5_dilation == 1, "Must set MODEL.RESNETS.RES5_DILATION = 1 for R18/R34"
+        assert (
+            res5_dilation == 1
+        ), "Must set MODEL.RESNETS.RES5_DILATION = 1 for R18/R34"
         assert num_groups == 1, "Must set MODEL.RESNETS.NUM_GROUPS = 1 for R18/R34"
 
     stages = []
 
     # Avoid creating variables without gradients
     # It consumes extra memory and may cause allreduce to fail
-    out_stage_idx = [{"res2": 2, "res3": 3, "res4": 4, "res5": 5}[f] for f in out_features]
+    out_stage_idx = [
+        {"res2": 2, "res3": 3, "res4": 4, "res5": 5}[f] for f in out_features
+    ]
     max_stage_idx = max(out_stage_idx)
     for idx, stage_idx in enumerate(range(2, max_stage_idx + 1)):
         dilation = res5_dilation if stage_idx == 5 else 1
         first_stride = 1 if idx == 0 or (stage_idx == 5 and dilation == 2) else 2
-        instance_norm = False if stage_idx == max_stage_idx else instance_norm 
+        instance_norm = False if stage_idx == max_stage_idx else instance_norm
         stage_kargs = {
             "num_blocks": num_blocks_per_stage[idx],
             "first_stride": first_stride,
