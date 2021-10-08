@@ -248,8 +248,20 @@ if __name__ == "__main__":
     """
     S3 handling to upload outputs
     """
-    if args.eval_only and cl_task:
-        cl_task.upload_artifact(
-            name="predictions",
-            artifact_object="./output/inference/coco_instances_results.json",
-        )
+    if args.eval_only:
+        from tester import coco_eval
+
+        pred_path = Path(local_output_dir)
+        pred_path = pred_path / "inference/coco_instances_results.json"
+        if cl_task:
+            cl_task.upload_artifact(
+                name="predictions",
+                artifact_object=str(pred_path),
+            )
+        data_dir = Path(local_data_dir)
+        evals = coco_eval(pred_path, data_dir, val_str="val")
+        if cl_task:
+            cl_task.upload_artifact(
+                name="evaluations",
+                artifact_object=evals,
+            )
