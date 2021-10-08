@@ -144,11 +144,15 @@ if __name__ == "__main__":
     """
     S3 handling to download weights and datasets
     """
-    from utils.s3_helper import S3_handler
-    import ssl
-    import wget
+    local_weight_dir = "weights"
+    local_data_dir = "datasets"
+    local_output_dir = "output"
 
     if not args.skip_s3:
+        from utils.s3_helper import S3_handler
+        import ssl
+        import wget
+
         CERT_PATH = os.environ.get(
             "CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt"
         )
@@ -161,10 +165,6 @@ if __name__ == "__main__":
         s3_handler = S3_handler(
             AWS_ENDPOINT_URL, AWS_ACCESS_KEY, AWS_SECRET_ACCESS, CERT_PATH
         )
-
-        local_weight_dir = "weights"
-        local_data_dir = "datasets"
-        local_output_dir = "output"
 
         local_weights_paths = s3_handler.dl_files(
             args.download_models,
@@ -258,7 +258,14 @@ if __name__ == "__main__":
                 name="predictions",
                 artifact_object=str(pred_path),
             )
-        data_dir = Path(local_data_dir)
+        if args.custom_cocojsons:
+            for custom_json in args.custom_cocojsons:
+                custom_json_path = Path(custom_json)
+                if "val" in custom_json_path.stem:
+                    data_dir = custom_json_path.parent
+                    break
+        else:
+            data_dir = Path(local_data_dir)
         evals = coco_eval(pred_path, data_dir, val_str="val")
         if cl_task:
             cl_task.upload_artifact(
