@@ -272,3 +272,7 @@ if __name__ == "__main__":
                 name="evaluations",
                 artifact_object=evals,
             )
+            cl_logger = cl_task.get_logger()
+            for val_set, eval_values in evals.items():
+                for metric, value in eval_values.items():
+                    cl_logger.report_scalar(title=val_set, series=metric, value=value, iteration=0)                
