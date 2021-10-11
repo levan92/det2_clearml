@@ -18,7 +18,7 @@ def coco_eval(pred_path, local_data_dir, val_str="val"):
 
     evals = {}
 
-    for gt_path in local_data_dir.glob("val*.json"):
+    for gt_path in local_data_dir.rglob(f"{val_str}*.json"):
         print(f"Evaluating {gt_path.stem}")
         cocoGt = COCO(str(gt_path))
 
