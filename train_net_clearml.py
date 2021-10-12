@@ -277,5 +277,5 @@ if __name__ == "__main__":
             for val_set, eval_values in evals.items():
                 for metric, value in eval_values.items():
                     cl_logger.report_scalar(
-                        title=val_set, series=metric, value=value, iteration=0
+                        title=val_set.replace('_coco-catified',''), series=metric, value=value, iteration=0
                     )
