@@ -6,10 +6,12 @@ from pycocotools.cocoeval import COCOeval
 from copy import deepcopy
 from pprint import pprint
 
+from utils.det2_helper import get_root_and_json
+
 STATS = ["AP", "AP@0.5", "AP@0.75", "AP@small", "AP@medium", "AP@large"]
 
 
-def coco_eval(pred_path, local_data_dir, val_str="val"):
+def coco_eval(pred_path, local_data_dir, val_str="val", subfolder=None):
     pred_path = Path(pred_path)
     local_data_dir = Path(local_data_dir)
 
@@ -18,7 +20,15 @@ def coco_eval(pred_path, local_data_dir, val_str="val"):
 
     evals = {}
 
-    for gt_path in local_data_dir.rglob(f"{val_str}*.json"):
+    if subfolder is None:
+        search_for_json_in = local_data_dir
+    else:
+        dataset_image_root, json_path, set_name, phase = get_root_and_json(
+            subfolder, local_data_dir
+        )
+        search_for_json_in = json_path.parent
+
+    for gt_path in search_for_json_in.glob(f"{val_str}*.json"):
         print(f"Evaluating {gt_path.stem}")
         cocoGt = COCO(str(gt_path))
 

@@ -33,6 +33,11 @@ def download_dir_from_s3(
             continue
         local_fp = local_dir / remote_rel_path
         local_fp.parent.mkdir(parents=True, exist_ok=True)
+        if obj.key[-1] == "/":
+            download_dir_from_s3(
+                s3_resource, bucket_name, obj.key, local_fp, unzip=unzip
+            )
+            continue
         if not local_fp.is_file():
             print(f"Downloading {obj.key} from S3 to {local_fp}..")
             buck.download_file(obj.key, str(local_fp))

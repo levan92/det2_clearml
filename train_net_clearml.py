@@ -266,7 +266,8 @@ if __name__ == "__main__":
                     break
         else:
             data_dir = Path(local_data_dir)
-        evals = coco_eval(pred_path, data_dir, val_str="val")
+        datasets_test = datasets_test[0] if isinstance(datasets_test, tuple) else datasets_test
+        evals = coco_eval(pred_path, data_dir, val_str="val", subfolder=datasets_test)
         if cl_task:
             cl_task.upload_artifact(
                 name="evaluations",
@@ -275,4 +276,6 @@ if __name__ == "__main__":
             cl_logger = cl_task.get_logger()
             for val_set, eval_values in evals.items():
                 for metric, value in eval_values.items():
-                    cl_logger.report_scalar(title=val_set, series=metric, value=value, iteration=0)                
+                    cl_logger.report_scalar(
+                        title=val_set, series=metric, value=value, iteration=0
+                    )
