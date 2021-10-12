@@ -49,22 +49,24 @@ for size_i, cell_anchor in enumerate(cell_anchors):
 
 sizes_str = [f"[{round(k)}]" for k in sizes]
 sizes_str = ", ".join(sizes_str)
-sizes_str = f"SIZES: [{sizes_str}]"
-print(sizes_str)
+sizes_brackets_str = f"[{sizes_str}]"
+sizes_print_str = f"SIZES: {sizes_brackets_str}"
+print(sizes_print_str)
 ars_str = [f"{float(k):.1f}" for k in ars]
 ars_str = ", ".join(ars_str)
-ars_str = f"ASPECT_RATIOS: [[{ars_str}]]"
-print(ars_str)
+ars_brackets_str = f"[[{ars_str}]]"
+ars_print_str = f"ASPECT_RATIOS: {ars_brackets_str}"
+print(ars_print_str)
 
-args_sizes_str = f'--model-anchor-sizes "{sizes_str}" \\'
-args_ars_str = f'--model-anchor-ar "{ars_str}" \\'
+args_sizes_str = f'--model-anchor-sizes "{sizes_brackets_str}" \\'
+args_ars_str = f'--model-anchor-ar "{ars_brackets_str}" \\'
 print(args_sizes_str)
 print(args_ars_str)
 
 model_path = Path(args.model)
 out_path = model_path.parent / f"{model_path.stem}_anchors.txt"
 with out_path.open("w") as f:
-    f.write(sizes_str + "\n")
-    f.write(ars_str + "\n")
+    f.write(sizes_print_str + "\n")
+    f.write(ars_print_str + "\n")
     f.write(args_sizes_str + "\n")
     f.write(args_ars_str + "\n")
