@@ -30,7 +30,6 @@ from clearml import Task
 
 from data import AugDatasetMapper
 from models import resnet_IN_fpn
-from config import add_custom_configs
 
 
 def add_custom_configs(cfg: CfgNode):
