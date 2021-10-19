@@ -16,6 +16,16 @@ def parse_datasets_args(ds_args, datasets_to_reg):
     return ds
 
 
+def get_root_and_json(dataset_name, local_data_dir):
+    local_data_dir = Path(local_data_dir)
+    set_name, phase = dataset_name.split("_", 1)
+    dataset_dir = local_data_dir / set_name
+    assert dataset_dir.is_dir(), dataset_dir
+    dataset_image_root = dataset_dir / "images"
+    json_path = dataset_dir / f"{phase}.json"
+    return dataset_image_root, json_path, set_name, phase
+
+
 def register_datasets(
     dataset_name, local_data_dir=None, json_path=None, dataset_image_root=None
 ):
@@ -25,13 +35,11 @@ def register_datasets(
         json_path = Path(json_path)
         dataset_image_root = Path(dataset_image_root)
     else:
-        local_data_dir = Path(local_data_dir)
-        set_name, phase = dataset_name.rsplit("_", 1)
+        dataset_image_root, json_path, set_name, phase = get_root_and_json(
+            dataset_name, local_data_dir
+        )
         print("Registering", set_name, phase)
-        dataset_dir = local_data_dir / set_name
-        assert dataset_dir.is_dir(), dataset_dir
-        dataset_image_root = dataset_dir / "images"
-        json_path = dataset_dir / f"{phase}.json"
+
     assert dataset_image_root.is_dir(), dataset_image_root
     assert json_path.is_file(), json_path
     register_coco_instances(dataset_name, {}, json_path, dataset_image_root)
