@@ -1,10 +1,12 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import io
 import copy
 import logging
 import numpy as np
 import torch
 from fvcore.common.file_io import PathManager
 from PIL import Image
+import boto3
 
 from detectron2.data import transforms as T
 from detectron2.data import detection_utils as utils
@@ -68,6 +70,46 @@ def build_transform_gen(cfg, is_train):
     return tfm_gens
 
 
+def get_s3(s3_info):
+    if s3_info is None:
+        return None
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=s3_info["endpoint_url"],
+        aws_access_key_id=s3_info["aws_access_key_id"],
+        aws_secret_access_key=s3_info["aws_secret_access_key"],
+        region_name=s3_info["region_name"],
+        verify=s3_info["verify"],
+    )
+    return s3
+
+
+def read_image_s3(path, s3, bucket, format=None):
+    """
+    Adapted from detectron2.data.detection_utils.read_image
+
+    Read an image into the given format.
+    Will apply rotation and flipping if the image has such exif information.
+
+    Args:
+        bucket (str)
+        path (str): image file path from bucket
+        format (str): one of the supported image modes in PIL, or "BGR" or "YUV-BT.601".
+
+    Returns:
+        image (np.ndarray):
+            an HWC image in the given format, which is 0-255, uint8 for
+            supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
+    """
+    with io.BytesIO() as f:
+        s3.download_fileobj(bucket, path, f)
+        image = Image.open(f)
+        # work around this bug: https://github.com/python-pillow/Pillow/issues/3973
+        image = utils._apply_exif_orientation(image)
+        np_img = utils.convert_PIL_to_numpy(image, format)
+    return np_img
+
+
 class AugDatasetMapper:
     """
     A callable which takes a dataset dict in Detectron2 Dataset format,
@@ -85,7 +127,7 @@ class AugDatasetMapper:
     3. Prepare data and annotations to Tensor and :class:`Instances`
     """
 
-    def __init__(self, cfg, is_train=True):
+    def __init__(self, cfg, s3_info, is_train=True):
         if cfg.INPUT.CROP.ENABLED and is_train:
             self.crop_gen = T.RandomCrop(cfg.INPUT.CROP.TYPE, cfg.INPUT.CROP.SIZE)
             logging.getLogger(__name__).info(
@@ -120,6 +162,11 @@ class AugDatasetMapper:
                 else cfg.DATASETS.PRECOMPUTED_PROPOSAL_TOPK_TEST
             )
         self.is_train = is_train
+        if s3_info:
+            self.s3 = get_s3(s3_info)
+            self.s3_bucket = s3_info.get("bucket")
+        else:
+            self.s3 = None
 
     def __call__(self, dataset_dict):
         """
@@ -130,8 +177,16 @@ class AugDatasetMapper:
             dict: a format that builtin models in detectron2 accept
         """
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
-        # USER: Write your own image loading if it's not from a file
-        image = utils.read_image(dataset_dict["file_name"], format=self.img_format)
+
+        if self.s3:
+            image = read_image_s3(
+                dataset_dict["file_name"],
+                self.s3,
+                self.s3_bucket,
+                format=self.img_format,
+            )
+        else:
+            image = utils.read_image(dataset_dict["file_name"], format=self.img_format)
         utils.check_image_size(dataset_dict, image)
 
         if "annotations" not in dataset_dict or len(dataset_dict["annotations"]) == 0:

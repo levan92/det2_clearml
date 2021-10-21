@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 import torch
 from fvcore.nn.precise_bn import get_bn_modules
+import weakref
 
 import detectron2.utils.comm as comm
 from detectron2.checkpoint import DetectionCheckpointer
@@ -12,7 +13,15 @@ from detectron2.data import (
     build_detection_test_loader,
     build_detection_train_loader,
 )
-from detectron2.engine import DefaultTrainer, default_setup, hooks
+from detectron2.data.datasets import register_coco_instances
+from detectron2.engine import (
+    DefaultTrainer,
+    default_setup,
+    hooks,
+    create_ddp_model,
+    AMPTrainer,
+    SimpleTrainer,
+)
 from detectron2.evaluation import (
     CityscapesInstanceEvaluator,
     CityscapesSemSegEvaluator,
@@ -23,8 +32,13 @@ from detectron2.evaluation import (
     PascalVOCDetectionEvaluator,
     SemSegEvaluator,
     verify_results,
+    DatasetEvaluator,
+    inference_on_dataset,
+    print_csv_format,
+    verify_results,
 )
 from detectron2.modeling import GeneralizedRCNNWithTTA
+from detectron2.utils.logger import setup_logger
 
 from clearml import Task
 
@@ -49,6 +63,14 @@ def add_custom_configs(cfg: CfgNode):
     _C.SOLVER.BEST_CHECKPOINTER.METRIC = "bbox/AP50"
     _C.SOLVER.BEST_CHECKPOINTER.MODE = "max"
 
+    _C.DATASETS.S3 = CfgNode()
+    _C.DATASETS.S3.AWS_ENDPOINT_URL = ""
+    _C.DATASETS.S3.AWS_ACCESS_KEY = ""
+    _C.DATASETS.S3.AWS_SECRET_ACCESS = ""
+    _C.DATASETS.S3.REGION_NAME = ""
+    _C.DATASETS.S3.BUCKET = ""
+    _C.DATASETS.S3.CERT_PATH = ""
+
 
 class Trainer(DefaultTrainer):
     """
@@ -57,6 +79,41 @@ class Trainer(DefaultTrainer):
     are working on a new research project. In that case you can write your
     own training loop. You can use "tools/plain_train_net.py" as an example.
     """
+
+    def __init__(self, cfg, s3_info):
+        """
+        Args:
+            cfg (CfgNode):
+        """
+        super().__init__(cfg)
+        logger = logging.getLogger("detectron2")
+        if not logger.isEnabledFor(logging.INFO):  # setup_logger is not called for d2
+            setup_logger()
+        cfg = DefaultTrainer.auto_scale_workers(cfg, comm.get_world_size())
+
+        # Assume these objects must be constructed in this order.
+        model = self.build_model(cfg)
+        optimizer = self.build_optimizer(cfg, model)
+        data_loader = self.build_train_loader(cfg, s3_info)
+        self.s3_info = s3_info
+
+        model = create_ddp_model(model, broadcast_buffers=False)
+        self._trainer = (AMPTrainer if cfg.SOLVER.AMP.ENABLED else SimpleTrainer)(
+            model, data_loader, optimizer
+        )
+
+        self.scheduler = self.build_lr_scheduler(cfg, optimizer)
+        self.checkpointer = DetectionCheckpointer(
+            # Assume you want to save checkpoints together with logs/statistics
+            model,
+            cfg.OUTPUT_DIR,
+            trainer=weakref.proxy(self),
+        )
+        self.start_iter = 0
+        self.max_iter = cfg.SOLVER.MAX_ITER
+        self.cfg = cfg
+
+        self.register_hooks(self.build_hooks())
 
     def build_hooks(self):
         """
@@ -78,7 +135,7 @@ class Trainer(DefaultTrainer):
                 cfg.TEST.EVAL_PERIOD,
                 self.model,
                 # Build a new data loader to not affect training
-                self.build_train_loader(cfg),
+                self.build_train_loader(cfg, self.s3_info),
                 cfg.TEST.PRECISE_BN.NUM_ITER,
             )
             if cfg.TEST.PRECISE_BN.ENABLED and get_bn_modules(self.model)
@@ -97,7 +154,7 @@ class Trainer(DefaultTrainer):
             )
 
         def test_and_save_results():
-            self._last_eval_results = self.test(self.cfg, self.model)
+            self._last_eval_results = self.test(self.cfg, self.model, self.s3_info)
             return self._last_eval_results
 
         # Do evaluation after checkpointer, because then if it fails,
@@ -122,13 +179,13 @@ class Trainer(DefaultTrainer):
         return ret
 
     @classmethod
-    def build_test_loader(cls, cfg, dataset_name):
+    def build_test_loader(cls, cfg, dataset_name, s3_info=None):
         return build_detection_test_loader(
-            cfg, dataset_name, mapper=AugDatasetMapper(cfg, False)
+            cfg, dataset_name, mapper=AugDatasetMapper(cfg, s3_info, False)
         )
 
     @classmethod
-    def build_train_loader(cls, cfg):
+    def build_train_loader(cls, cfg, s3_info=None):
         """
         Returns:
             iterable
@@ -136,7 +193,9 @@ class Trainer(DefaultTrainer):
         It now calls :func:`detectron2.data.build_detection_train_loader`.
         Overwrite it if you'd like a different data loader.
         """
-        return build_detection_train_loader(cfg, mapper=AugDatasetMapper(cfg, True))
+        return build_detection_train_loader(
+            cfg, mapper=AugDatasetMapper(cfg, s3_info, True)
+        )
 
     @classmethod
     def build_evaluator(cls, cfg, dataset_name, output_folder=None):
@@ -203,6 +262,64 @@ class Trainer(DefaultTrainer):
         res = OrderedDict({k + "_TTA": v for k, v in res.items()})
         return res
 
+    @classmethod
+    def test(cls, cfg, model, s3_info, evaluators=None):
+        """
+        Evaluate the given model. The given model is expected to already contain
+        weights to evaluate.
+
+        Args:
+            cfg (CfgNode):
+            model (nn.Module):
+            evaluators (list[DatasetEvaluator] or None): if None, will call
+                :meth:`build_evaluator`. Otherwise, must have the same length as
+                ``cfg.DATASETS.TEST``.
+
+        Returns:
+            dict: a dict of result metrics
+        """
+        logger = logging.getLogger(__name__)
+        if isinstance(evaluators, DatasetEvaluator):
+            evaluators = [evaluators]
+        if evaluators is not None:
+            assert len(cfg.DATASETS.TEST) == len(evaluators), "{} != {}".format(
+                len(cfg.DATASETS.TEST), len(evaluators)
+            )
+
+        results = OrderedDict()
+        for idx, dataset_name in enumerate(cfg.DATASETS.TEST):
+            data_loader = cls.build_test_loader(cfg, dataset_name, s3_info)
+            # When evaluators are passed in as arguments,
+            # implicitly assume that evaluators can be created before data_loader.
+            if evaluators is not None:
+                evaluator = evaluators[idx]
+            else:
+                try:
+                    evaluator = cls.build_evaluator(cfg, dataset_name)
+                except NotImplementedError:
+                    logger.warn(
+                        "No evaluator found. Use `DefaultTrainer.test(evaluators=)`, "
+                        "or implement its `build_evaluator` method."
+                    )
+                    results[dataset_name] = {}
+                    continue
+            results_i = inference_on_dataset(model, data_loader, evaluator)
+            results[dataset_name] = results_i
+            if comm.is_main_process():
+                assert isinstance(
+                    results_i, dict
+                ), "Evaluator must return a dict on the main process. Got {} instead.".format(
+                    results_i
+                )
+                logger.info(
+                    "Evaluation results for {} in csv format:".format(dataset_name)
+                )
+                print_csv_format(results_i)
+
+        if len(results) == 1:
+            results = list(results.values())[0]
+        return results
+
 
 def setup(args, cl_task=None):
     """
@@ -230,50 +347,42 @@ def main(args, cl_task_id=None):
         ), "Current task in process does not match given task id!"
     else:
         cl_task = None
-    """
-    Datasets Registration
-    """
-    from utils.det2_helper import register_datasets, parse_datasets_args
 
-    local_data_dir = "datasets"
-    # Register the custom datasets that don't conform to dataset format assumptions first
-    already_reged = []
-    if args.custom_dsnames:
-        assert len(args.custom_dsnames) == len(args.custom_cocojsons)
-        assert len(args.custom_dsnames) == len(args.custom_imgroots)
+    if args.coco_dsnames:
+        assert len(args.coco_dsnames) == len(args.coco_jsons)
+        assert len(args.coco_dsnames) == len(args.coco_imgroots)
         for dsname, cjson, imroot in zip(
-            args.custom_dsnames, args.custom_cocojsons, args.custom_imgroots
+            args.coco_dsnames, args.coco_jsons, args.coco_imgroots
         ):
-            register_datasets(dsname, json_path=cjson, dataset_image_root=imroot)
-            already_reged.append(dsname)
-    # Then register remaining of train and test sets, assuming remainders all conform to dataset format.
-    datasets_to_reg = []
-    datasets_train = parse_datasets_args(args.datasets_train, datasets_to_reg)
-    datasets_test = parse_datasets_args(args.datasets_test, datasets_to_reg)
-    remainder_sets = list(set(datasets_to_reg) - set(already_reged))
-    for dataset_to_reg in remainder_sets:
-        register_datasets(dataset_to_reg, local_data_dir=local_data_dir)
+            register_coco_instances(dsname, {}, cjson, imroot)
 
     cfg = setup(args, cl_task)
+
+    if args.s3_direct_read:
+        s3_info = {
+            "endpoint_url": cfg.DATASETS.S3.AWS_ENDPOINT_URL,
+            "aws_access_key_id": cfg.DATASETS.S3.AWS_ACCESS_KEY,
+            "aws_secret_access_key": cfg.DATASETS.S3.AWS_SECRET_ACCESS,
+            "region_name": cfg.DATASETS.S3.REGION_NAME,
+            "bucket": cfg.DATASETS.S3.BUCKET,
+            "verify": cfg.DATASETS.S3.CERT_PATH if cfg.DATASETS.S3.CERT_PATH else None,
+        }
+    else:
+        s3_info = None
 
     if args.eval_only:
         model = Trainer.build_model(cfg)
         DetectionCheckpointer(model, save_dir=cfg.OUTPUT_DIR).resume_or_load(
             cfg.MODEL.WEIGHTS, resume=args.resume
         )
-        res = Trainer.test(cfg, model)
+        res = Trainer.test(cfg, model, s3_info)
         if cfg.TEST.AUG.ENABLED:
             res.update(Trainer.test_with_TTA(cfg, model))
         if comm.is_main_process():
             verify_results(cfg, res)
         return res
 
-    """
-    If you'd like to do anything fancier than the standard training logic,
-    consider writing your own training loop (see plain_train_net.py) or
-    subclassing the trainer.
-    """
-    trainer = Trainer(cfg)
+    trainer = Trainer(cfg, s3_info)
     trainer.resume_or_load(resume=args.resume)
     if cfg.TEST.AUG.ENABLED:
         trainer.register_hooks(

@@ -45,7 +45,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--clearml-output-uri",
-        default="s3://ecs.dsta.ai:80/clearml-models/default",
+        # default="s3://ecs.dsta.ai:80/clearml-models/default",
         help="ClearML output uri",
     )
     parser.add_argument(
@@ -80,17 +80,22 @@ if __name__ == "__main__":
     parser.add_argument("--s3-data-bucket", help="S3 Bucket for data")
     parser.add_argument("--s3-data-path", help="S3 Data Path")
     parser.add_argument(
-        "--custom-dsnames",
+        "--s3-direct-read",
+        help="DATASETS.S3.ENABLED | enable direct reading of images from S3 bucket without initial download.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--coco-dsnames",
         help="Names of custom datasets (must match to those in args.datasets_train and args.datasets_test). Only for custom datasets that does not conform to repo dataset assumptions.",
         nargs="*",
     )
     parser.add_argument(
-        "--custom-cocojsons",
+        "--coco-jsons",
         help="Paths to coco json file. Only for custom datasets that does not conform to repo dataset assumptions.",
         nargs="*",
     )
     parser.add_argument(
-        "--custom-imgroots",
+        "--coco-imgroots",
         help="Paths to img roots. Only for custom datasets that does not conform to repo dataset assumptions.",
         nargs="*",
     )
@@ -157,7 +162,7 @@ if __name__ == "__main__":
             "CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt"
         )
         CERT_DL_URL = "http://gitlab.dsta.ai/ai-platform/getting-started/raw/master/config/ca.dsta.ai.crt"
-        if CERT_DL_URL:
+        if CERT_DL_URL and CERT_PATH and not Path(CERT_PATH).is_file():
             ssl._create_default_https_context = ssl._create_unverified_context
             wget.download(CERT_DL_URL)
             CERT_PATH = Path(CERT_DL_URL).name
@@ -166,21 +171,23 @@ if __name__ == "__main__":
             AWS_ENDPOINT_URL, AWS_ACCESS_KEY, AWS_SECRET_ACCESS, CERT_PATH
         )
 
-        local_weights_paths = s3_handler.dl_files(
-            args.download_models,
-            args.s3_models_bucket,
-            args.s3_models_path,
-            local_weight_dir,
-            unzip=True,
-        )
+        if args.download_models:
+            local_weights_paths = s3_handler.dl_files(
+                args.download_models,
+                args.s3_models_bucket,
+                args.s3_models_path,
+                local_weight_dir,
+                unzip=True,
+            )
 
-        local_data_dirs = s3_handler.dl_dirs(
-            args.download_data,
-            args.s3_data_bucket,
-            args.s3_data_path,
-            local_data_dir,
-            unzip=True,
-        )
+        if args.download_data:
+            local_data_dirs = s3_handler.dl_dirs(
+                args.download_data,
+                args.s3_data_bucket,
+                args.s3_data_path,
+                local_data_dir,
+                unzip=True,
+            )
 
     """
     Datasets Registration
@@ -224,6 +231,14 @@ if __name__ == "__main__":
     extend_opts(args.opts, "MODEL.ANCHOR_GENERATOR.SIZES", args.model_anchor_sizes)
     extend_opts(args.opts, "MODEL.ANCHOR_GENERATOR.ASPECT_RATIOS", args.model_anchor_ar)
 
+    if args.s3_direct_read:
+        extend_opts(args.opts, "DATASETS.S3.AWS_ENDPOINT_URL", AWS_ENDPOINT_URL)
+        extend_opts(args.opts, "DATASETS.S3.AWS_ACCESS_KEY", AWS_ACCESS_KEY)
+        extend_opts(args.opts, "DATASETS.S3.AWS_SECRET_ACCESS", AWS_SECRET_ACCESS)
+        extend_opts(args.opts, "DATASETS.S3.REGION_NAME", "us-east-1")
+        extend_opts(args.opts, "DATASETS.S3.BUCKET", args.s3_data_bucket)
+        extend_opts(args.opts, "DATASETS.S3.CERT_PATH", CERT_PATH)
+
     """
     Launching detectron2 run
     """
@@ -266,7 +281,9 @@ if __name__ == "__main__":
                     break
         else:
             data_dir = Path(local_data_dir)
-        datasets_test = datasets_test[0] if isinstance(datasets_test, tuple) else datasets_test
+        datasets_test = (
+            datasets_test[0] if isinstance(datasets_test, tuple) else datasets_test
+        )
         evals = coco_eval(pred_path, data_dir, val_str="val", subfolder=datasets_test)
         if cl_task:
             cl_task.upload_artifact(
@@ -277,5 +294,8 @@ if __name__ == "__main__":
             for val_set, eval_values in evals.items():
                 for metric, value in eval_values.items():
                     cl_logger.report_scalar(
-                        title=val_set.replace('_coco-catified',''), series=metric, value=value, iteration=0
+                        title=val_set.replace("_coco-catified", ""),
+                        series=metric,
+                        value=value,
+                        iteration=0,
                     )
