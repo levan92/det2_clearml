@@ -156,13 +156,13 @@ if __name__ == "__main__":
     if not args.skip_s3:
         from utils.s3_helper import S3_handler
         import ssl
-        import wget
 
         CERT_PATH = os.environ.get(
             "CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt"
         )
         CERT_DL_URL = "http://gitlab.dsta.ai/ai-platform/getting-started/raw/master/config/ca.dsta.ai.crt"
         if CERT_DL_URL and CERT_PATH and not Path(CERT_PATH).is_file():
+            import utils.wget as wget
             ssl._create_default_https_context = ssl._create_unverified_context
             wget.download(CERT_DL_URL)
             CERT_PATH = Path(CERT_DL_URL).name
