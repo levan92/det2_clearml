@@ -97,6 +97,7 @@ class S3_handler:
                 s3_file_path = s3_parent_path / file
                 local_file_path = local_parent / file
                 local_file_path.parent.mkdir(parents=True, exist_ok=True)
+                print(f'Downloading from {s3_file_path} from bucket {s3_bucket} to {local_file_path}..')
                 buck.download_file(str(s3_file_path), str(local_file_path))
                 assert local_file_path.is_file()
                 local_dled_files.append(local_file_path)

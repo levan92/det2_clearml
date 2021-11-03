@@ -77,6 +77,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--download-data", help="List of dataset to download", nargs="+"
     )
+    parser.add_argument(
+        "--local-data-dir", help="Destination dataset files downloaded to", default='datasets'
+    )
     parser.add_argument("--s3-data-bucket", help="S3 Bucket for data")
     parser.add_argument("--s3-data-path", help="S3 Data Path")
     parser.add_argument(
@@ -86,17 +89,17 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--coco-dsnames",
-        help="Names of custom datasets (must match to those in args.datasets_train and args.datasets_test). Only for custom datasets that does not conform to repo dataset assumptions.",
+        help="Names of custom datasets (must match to those in args.datasets_train and args.datasets_test).",
         nargs="*",
     )
     parser.add_argument(
         "--coco-jsons",
-        help="Paths to coco json file. Only for custom datasets that does not conform to repo dataset assumptions.",
+        help="Paths to coco json file.",
         nargs="*",
     )
     parser.add_argument(
         "--coco-imgroots",
-        help="Paths to img roots. Only for custom datasets that does not conform to repo dataset assumptions.",
+        help="Paths to img roots.",
         nargs="*",
     )
     # Datasets to register, will override config.yaml
@@ -150,7 +153,7 @@ if __name__ == "__main__":
     S3 handling to download weights and datasets
     """
     local_weight_dir = "weights"
-    local_data_dir = "datasets"
+    local_data_dir = args.local_data_dir
     local_output_dir = "output"
 
     if not args.skip_s3:
@@ -181,13 +184,22 @@ if __name__ == "__main__":
             )
 
         if args.download_data:
-            local_data_dirs = s3_handler.dl_dirs(
-                args.download_data,
-                args.s3_data_bucket,
-                args.s3_data_path,
-                local_data_dir,
-                unzip=True,
-            )
+            if args.s3_direct_read:
+                local_data_dirs = s3_handler.dl_files(
+                    args.download_data,
+                    args.s3_data_bucket,
+                    args.s3_data_path,
+                    local_data_dir,
+                    unzip=True,
+                )
+            else:
+                local_data_dirs = s3_handler.dl_dirs(
+                    args.download_data,
+                    args.s3_data_bucket,
+                    args.s3_data_path,
+                    local_data_dir,
+                    unzip=True,
+                )
 
     """
     Datasets Registration
