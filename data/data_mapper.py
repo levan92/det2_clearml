@@ -84,7 +84,7 @@ def get_s3(s3_info):
     return s3
 
 
-def read_image_s3(path, s3, bucket, format=None):
+def read_image_s3(path, s3_info, format=None):
     """
     Adapted from detectron2.data.detection_utils.read_image
 
@@ -101,6 +101,8 @@ def read_image_s3(path, s3, bucket, format=None):
             an HWC image in the given format, which is 0-255, uint8 for
             supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
     """
+    s3 = get_s3(s3_info)
+    bucket = s3_info.get("bucket")
     with io.BytesIO() as f:
         s3.download_fileobj(bucket, path, f)
         image = Image.open(f)
@@ -163,10 +165,9 @@ class AugDatasetMapper:
             )
         self.is_train = is_train
         if s3_info:
-            self.s3 = get_s3(s3_info)
-            self.s3_bucket = s3_info.get("bucket")
+            self.s3_info = s3_info
         else:
-            self.s3 = None
+            self.s3_info = None
 
     def __call__(self, dataset_dict):
         """
@@ -178,11 +179,10 @@ class AugDatasetMapper:
         """
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
 
-        if self.s3:
+        if self.s3_info:
             image = read_image_s3(
                 dataset_dict["file_name"],
-                self.s3,
-                self.s3_bucket,
+                self.s3_info,
                 format=self.img_format,
             )
         else:
