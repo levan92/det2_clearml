@@ -43,7 +43,7 @@ INPUT:
     CROP:
         ENABLED: True
         TYPE: "relative_range"
-        SIZE: [0.8,1.0]
+        SIZE: [0.5,1.0]
     LARGE_SCALE_JITTER:
         ENABLED: False
         MIN_SCALE: 0.5
