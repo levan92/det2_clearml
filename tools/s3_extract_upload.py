@@ -3,19 +3,23 @@ from clearml import Task
 import os
 import zipfile, tarfile
 from io import BytesIO
-import boto3
 from pathlib import Path
 import argparse
+
+import boto3
 from boto3.s3.transfer import TransferConfig
+from botocore.client import Config
 
 GB = 1024 ** 3
 NO_MPUPLOAD = TransferConfig(multipart_threshold=20*GB)
 
-def buffered_read(body, chunksize=1024**3):
+def buffered_read(stream_body, chunksize=1024**3):
     byte_arr = bytearray()
-    for i, chunk in enumerate(body.read(chunksize)):
+    for i, chunk in enumerate(stream_body.iter_chunks(chunk_size=chunksize)):
         print(f'chunk {i}')
-        byte_arr.append(chunk)
+        print(len(chunk))
+        byte_arr.extend(chunk)
+        print(len(byte_arr))
     return byte_arr
 
 def extract_upload(s3_resource, obj, dest_bucket, upload_dir_path, verbose=False, filetype='zip'):
@@ -42,21 +46,21 @@ def extract_upload(s3_resource, obj, dest_bucket, upload_dir_path, verbose=False
                 )
     elif filetype =='tar':
         with BytesIO(buffered_read(obj.get()['Body'])) as buffer:
-            with tarfile.open(fileobj=buffer) as tar:
-                print(tar)
-                print(tar.getmembers())
-                for member in tar.getmembers():
-                    if member.isdir():
-                        if verbose: 
-                            print(f"Skipping {member.name} as it is dir.")
+            with tarfile.open(fileobj=buffer, mode='r') as tar:
+                for tarinfo in tar:
+                    fname = tarinfo.name
+                    if not tarinfo.isfile():
+                        continue 
+                    if fname is None:
                         continue
-                    upload_path = upload_dir_path / member.name
+                    upload_path = upload_dir_path / fname
                     if verbose:
-                        print(member.name)
+                        print(fname)
                         print("Uploading to", upload_path)
-                    # s3_resource.meta.client.upload_fileobj(
-                    #     z.extractfile(member), Bucket=dest_bucket, Key=f"{upload_path}", Config=NO_MPUPLOAD
-                    # )
+
+                    s3_resource.meta.client.upload_fileobj(
+                        tar.extractfile(tarinfo), Bucket=dest_bucket, Key=f"{upload_path}", Config=NO_MPUPLOAD
+                    )
 
 
 ap = argparse.ArgumentParser()
@@ -80,6 +84,7 @@ AWS_SECRET_ACCESS = os.environ.get("AWS_SECRET_ACCESS")
 CERT_PATH = os.environ.get(
     "CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt"
 )
+CERT_PATH = CERT_PATH if CERT_PATH else None
 
 if args.remote:
     """
@@ -110,6 +115,8 @@ s3_resource = boto3.resource(
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_ACCESS,
     verify=CERT_PATH,
+    config=Config(signature_version="s3v4"),
+    region_name="us-east-1",
 )
 
 src_bucket = s3_resource.Bucket(src_buck)
