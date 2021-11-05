@@ -126,9 +126,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("Command Line Args:", args)
 
-    AWS_ENDPOINT_URL = os.environ.get("AWS_ENDPOINT_URL", "https://ecs.dsta.ai")
-    AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY")
-    AWS_SECRET_ACCESS = os.environ.get("AWS_SECRET_ACCESS")
+    environs_names = ["AWS_ENDPOINT_URL", "AWS_ACCESS_KEY", "AWS_SECRET_ACCESS", "CERT_PATH", "CERT_DL_URL"]
+    environs = {var: os.environ.get(var) for var in environs_names}
+
     """
     clearml task init
     """
@@ -139,8 +139,9 @@ if __name__ == "__main__":
             task_type=args.clearml_task_type,
             output_uri=args.clearml_output_uri,
         )
+        env_strs = ' '.join([ f"--env {k}={v}" for k, v in environs.items() ])
         cl_task.set_base_docker(
-            f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ENDPOINT_URL={AWS_ENDPOINT_URL} --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS} --env CERT_PATH={CERT_PATH} --env CERT_DL_URL={CERT_DL_URL}"
+            f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true {env_strs}"
         )
         if not args.clearml_run_locally:
             cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
@@ -159,19 +160,17 @@ if __name__ == "__main__":
     if not args.skip_s3:
         from utils.s3_helper import S3_handler
 
-        CERT_PATH = os.environ.get(
-            "CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt"
-        )
-        CERT_DL_URL = "http://gitlab.dsta.ai/ai-platform/getting-started/raw/master/config/ca.dsta.ai.crt"
-        if CERT_DL_URL and CERT_PATH and not Path(CERT_PATH).is_file():
+        environs['CERT_PATH'] = environs['CERT_PATH'] if environs['CERT_PATH'] else None
+        if environs['CERT_DL_URL'] and environs['CERT_PATH'] and not Path(environs['CERT_PATH']).is_file():
             import utils.wget as wget
             import ssl
             ssl._create_default_https_context = ssl._create_unverified_context
-            wget.download(CERT_DL_URL)
-            CERT_PATH = Path(CERT_DL_URL).name
+            print(f'Downloading from {environs["CERT_DL_URL"]}')
+            wget.download(environs['CERT_DL_URL'])
+            environs['CERT_PATH'] = Path(environs['CERT_DL_URL']).name
 
         s3_handler = S3_handler(
-            AWS_ENDPOINT_URL, AWS_ACCESS_KEY, AWS_SECRET_ACCESS, CERT_PATH
+            environs['AWS_ENDPOINT_URL'], environs['AWS_ACCESS_KEY'], environs['AWS_SECRET_ACCESS'], environs['CERT_PATH']
         )
 
         if args.download_models:
@@ -244,12 +243,12 @@ if __name__ == "__main__":
     extend_opts(args.opts, "MODEL.ANCHOR_GENERATOR.ASPECT_RATIOS", args.model_anchor_ar)
 
     if args.s3_direct_read:
-        extend_opts(args.opts, "DATASETS.S3.AWS_ENDPOINT_URL", AWS_ENDPOINT_URL)
-        extend_opts(args.opts, "DATASETS.S3.AWS_ACCESS_KEY", AWS_ACCESS_KEY)
-        extend_opts(args.opts, "DATASETS.S3.AWS_SECRET_ACCESS", AWS_SECRET_ACCESS)
+        extend_opts(args.opts, "DATASETS.S3.AWS_ENDPOINT_URL", environs['AWS_ENDPOINT_URL'])
+        extend_opts(args.opts, "DATASETS.S3.AWS_ACCESS_KEY", environs['AWS_ACCESS_KEY'])
+        extend_opts(args.opts, "DATASETS.S3.AWS_SECRET_ACCESS", environs['AWS_SECRET_ACCESS'])
         extend_opts(args.opts, "DATASETS.S3.REGION_NAME", "us-east-1")
         extend_opts(args.opts, "DATASETS.S3.BUCKET", args.s3_data_bucket)
-        extend_opts(args.opts, "DATASETS.S3.CERT_PATH", CERT_PATH)
+        extend_opts(args.opts, "DATASETS.S3.CERT_PATH", environs['CERT_PATH'])
 
     """
     Launching detectron2 run
