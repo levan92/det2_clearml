@@ -140,7 +140,7 @@ if __name__ == "__main__":
             output_uri=args.clearml_output_uri,
         )
         cl_task.set_base_docker(
-            f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS}"
+            f"{args.docker_img} --env GIT_SSL_NO_VERIFY=true --env AWS_ENDPOINT_URL={AWS_ENDPOINT_URL} --env AWS_ACCESS_KEY={AWS_ACCESS_KEY} --env AWS_SECRET_ACCESS={AWS_SECRET_ACCESS} --env CERT_PATH={CERT_PATH} --env CERT_DL_URL={CERT_DL_URL}"
         )
         if not args.clearml_run_locally:
             cl_task.execute_remotely(queue_name=args.queue, exit_process=True)
@@ -158,7 +158,6 @@ if __name__ == "__main__":
 
     if not args.skip_s3:
         from utils.s3_helper import S3_handler
-        import ssl
 
         CERT_PATH = os.environ.get(
             "CERT_PATH", "/usr/share/ca-certificates/extra/ca.dsta.ai.crt"
@@ -166,6 +165,7 @@ if __name__ == "__main__":
         CERT_DL_URL = "http://gitlab.dsta.ai/ai-platform/getting-started/raw/master/config/ca.dsta.ai.crt"
         if CERT_DL_URL and CERT_PATH and not Path(CERT_PATH).is_file():
             import utils.wget as wget
+            import ssl
             ssl._create_default_https_context = ssl._create_unverified_context
             wget.download(CERT_DL_URL)
             CERT_PATH = Path(CERT_DL_URL).name
