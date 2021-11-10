@@ -21,6 +21,7 @@ from detectron2.engine import (
     create_ddp_model,
     AMPTrainer,
     SimpleTrainer,
+    TrainerBase
 )
 from detectron2.evaluation import (
     CityscapesInstanceEvaluator,
@@ -85,7 +86,7 @@ class Trainer(DefaultTrainer):
         Args:
             cfg (CfgNode):
         """
-        super().__init__(cfg)
+        TrainerBase.__init__(self)
         logger = logging.getLogger("detectron2")
         if not logger.isEnabledFor(logging.INFO):  # setup_logger is not called for d2
             setup_logger()
