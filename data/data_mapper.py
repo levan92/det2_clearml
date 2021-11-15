@@ -84,7 +84,7 @@ def get_s3(s3_info):
     return s3
 
 
-def read_image_s3(path, s3_info, format=None):
+def read_image_s3(path, s3, bucket, format=None):
     """
     Adapted from detectron2.data.detection_utils.read_image
 
@@ -93,7 +93,8 @@ def read_image_s3(path, s3_info, format=None):
 
     Args:
         path (str): image file path from bucket
-        s3_info (dict): dictionary of information needed for s3 communication (endpoint_url, bucket, aws_access_key_id, aws_secret_access_key, region_name, verify)
+        s3 (`S3.Client`): boto3 object
+        bucket (str): bucketname
         format (str): one of the supported image modes in PIL, or "BGR" or "YUV-BT.601".
 
     Returns:
@@ -101,8 +102,7 @@ def read_image_s3(path, s3_info, format=None):
             an HWC image in the given format, which is 0-255, uint8 for
             supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
     """
-    s3 = get_s3(s3_info)
-    bucket = s3_info.get("bucket")
+
     with io.BytesIO() as f:
         s3.download_fileobj(bucket, path, f)
         image = Image.open(f)
@@ -130,6 +130,9 @@ class AugDatasetMapper:
     """
 
     def __init__(self, cfg, s3_info, is_train=True):
+        """
+        s3_info (dict, optional): dictionary of information needed for s3 communication (endpoint_url, bucket, aws_access_key_id, aws_secret_access_key, region_name, verify)
+        """
         if cfg.INPUT.CROP.ENABLED and is_train:
             self.crop_gen = T.RandomCrop(cfg.INPUT.CROP.TYPE, cfg.INPUT.CROP.SIZE)
             logging.getLogger(__name__).info(
@@ -168,6 +171,7 @@ class AugDatasetMapper:
             self.s3_info = s3_info
         else:
             self.s3_info = None
+        self.s3 = None
 
     def __call__(self, dataset_dict):
         """
@@ -180,10 +184,13 @@ class AugDatasetMapper:
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
 
         if self.s3_info:
-            # download from s3 into memory and directly read it  
+            if self.s3 is None:
+                self.s3 = get_s3(self.s3_info)
+            # download from s3 into memory and directly read it
             image = read_image_s3(
                 dataset_dict["file_name"],
-                self.s3_info,
+                self.s3,
+                self.s3_info["bucket"],
                 format=self.img_format,
             )
         else:
