@@ -331,9 +331,9 @@ def setup(args, cl_task=None):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
 
-    if cl_task:
-        cl_dict = cl_task.connect_configuration(name="hyperparams", configuration=cfg)
-        cfg = CfgNode(init_dict=cl_dict)
+    # if cl_task:
+    #     cl_dict = cl_task.connect_configuration(name="hyperparams", configuration=cfg)
+    #     cfg = CfgNode(init_dict=cl_dict)
 
     cfg.freeze()
     default_setup(cfg, args)
